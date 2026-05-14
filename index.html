@@ -235,6 +235,11 @@
     .vch { font-size:10px;color:var(--text2);margin-top:2px; }
     .vx { color:rgba(200,60,60,.4);font-size:13px;background:none;border:none;cursor:pointer;padding:0 2px;flex-shrink:0;align-self:flex-start;transition:color .14s; }
     .vx:hover { color:rgba(200,60,60,.9); }
+    .v-acts { display:flex;flex-direction:column;gap:3px;flex-shrink:0; }
+    .v-item.dragging { opacity:.35;background:rgba(10,155,191,.08); }
+    .v-item.drag-over { border-color:var(--accent);background:rgba(10,155,191,.14);box-shadow:0 0 0 2px rgba(10,155,191,.25); }
+    .drag-handle { color:var(--text2);font-size:10px;cursor:grab;padding:0 2px;flex-shrink:0;align-self:center;opacity:.5;user-select:none; }
+    .drag-handle:active { cursor:grabbing; }
 
     /* ── MODALS ─────────────────────────────────────────── */
     .ov { display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;background:rgba(20,80,120,.28);backdrop-filter:blur(10px); }
@@ -363,6 +368,7 @@
         <div id="vol-row">
           <span class="vi">Vol</span>
           <input id="vol" type="range" min="0" max="100" value="80" oninput="setVol(this.value)">
+          <button class="cb" id="norm-btn" onclick="toggleNorm()" title="Volume normalize (resets vol to 80 on each track)">Norm</button>
           <button class="cb lit" id="automix-btn" onclick="toggleAutomix()" title="Automix">Automix</button>
         </div>
       </div>
@@ -482,11 +488,15 @@ async function pipedRace(path, params = {}) {
   ));
 }
 
+function decodeHtml(s) {
+  const t = document.createElement('textarea'); t.innerHTML = String(s); return t.value;
+}
+
 function pipedToVid(item) {
   const qs = item.url ? (item.url.split('?')[1] || '') : '';
   const id = new URLSearchParams(qs).get('v') || item.videoId || '';
   const chId = item.uploaderUrl?.split('/channel/')?.[1]?.split('/')?.[0] || '';
-  return { id, title: item.title || id, channelTitle: item.uploaderName || item.uploader || '', channelId: chId, thumbnail: id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : '' };
+  return { id, title: decodeHtml(item.title || id), channelTitle: decodeHtml(item.uploaderName || item.uploader || ''), channelId: chId, thumbnail: id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : '' };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -557,7 +567,7 @@ async function ytApi(ep, params) {
 }
 function snToVid(item) {
   const sn = item.snippet || {}, id = item.id?.videoId || item.id || '';
-  return { id, title: sn.title || id, channelTitle: sn.channelTitle || '', channelId: sn.channelId || '', thumbnail: id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : '' };
+  return { id, title: decodeHtml(sn.title || id), channelTitle: decodeHtml(sn.channelTitle || ''), channelId: sn.channelId || '', thumbnail: id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : '' };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -594,7 +604,7 @@ async function videoFromId(id) {
     if (r.ok) {
       const d = await r.json();
       const chId = d.author_url?.split('/channel/')?.[1]?.split('/')?.[0] || '';
-      return { id, title: d.title || id, channelTitle: d.author_name || '', channelId: chId, thumbnail };
+      return { id, title: decodeHtml(d.title || id), channelTitle: decodeHtml(d.author_name || ''), channelId: chId, thumbnail };
     }
   } catch {}
   return { id, title: id, channelTitle: '', channelId: '', thumbnail };
@@ -627,7 +637,7 @@ let player = null, ready = false;
 let current = null, queue = [];
 let playlists = JSON.parse(localStorage.getItem('yt_pls') || '[]');
 let activePlId = null;
-let playing = false, shuffle = false, repeat = false, automix = true;
+let playing = false, shuffle = false, repeat = false, automix = true, normalize = false;
 let progTimer = null, pendingAddPl = null, toastTmr;
 
 // ─────────────────────────────────────────────────────────
@@ -679,6 +689,7 @@ function playVideo(v) {
   current = v;
   document.getElementById('ph').style.display = 'none';
   player.loadVideoById(v.id);
+  if (normalize) setTimeout(() => { if (ready) player.setVolume(80); }, 600);
   document.getElementById('np-title').textContent = v.title;
   document.getElementById('np-ch').textContent = v.channelTitle || '';
   const th = document.getElementById('np-thumb'); th.src = v.thumbnail || ''; th.style.display = v.thumbnail ? 'block' : 'none';
@@ -747,15 +758,30 @@ function makeResultItem(v) {
 // ─────────────────────────────────────────────────────────
 function addToQueue(v) { queue.push(v); renderQueue(); toast('Added: ' + v.title.slice(0,40)); }
 function popQueue() { const v = shuffle ? queue.splice(Math.floor(Math.random()*queue.length),1)[0] : queue.shift(); playVideo(v); renderQueue(); }
+let dragSrcIdx = null;
+
 function renderQueue() {
   const box = document.getElementById('queue-list');
   if (!queue.length) { box.innerHTML = '<div class="empty">Queue is empty</div>'; return; }
   box.innerHTML = '';
   queue.forEach((v,i) => {
-    const el = document.createElement('div'); el.className = 'v-item';
-    el.innerHTML = `<img class="vt" src="${esc(v.thumbnail)}" loading="lazy" alt=""><div class="vi2"><div class="vtt">${esc(v.title)}</div><div class="vch">${esc(v.channelTitle||'')}</div></div><button class="vx" title="Remove">x</button>`;
+    const el = document.createElement('div'); el.className = 'v-item'; el.draggable = true;
+    el.dataset.idx = i;
+    el.innerHTML = `<span class="drag-handle" title="Drag to reorder">&#8801;</span><img class="vt" src="${esc(v.thumbnail)}" loading="lazy" alt=""><div class="vi2"><div class="vtt">${esc(v.title)}</div><div class="vch">${esc(v.channelTitle||'')}</div></div><button class="vx" title="Remove">x</button>`;
     el.querySelector('.vx').onclick = e => { e.stopPropagation(); queue.splice(i,1); renderQueue(); };
-    el.onclick = e => { if (!e.target.classList.contains('vx')) { queue.splice(i,1); playVideo(v); renderQueue(); } };
+    el.onclick = e => { if (e.target.classList.contains('vx')) return; if (e.target.classList.contains('drag-handle')) return; queue.splice(i,1); playVideo(v); renderQueue(); };
+    el.addEventListener('dragstart', e => { dragSrcIdx = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend',   () => { el.classList.remove('dragging'); box.querySelectorAll('.v-item').forEach(x => x.classList.remove('drag-over')); });
+    el.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop',      e => {
+      e.preventDefault(); el.classList.remove('drag-over');
+      const dst = +el.dataset.idx;
+      if (dragSrcIdx === null || dragSrcIdx === dst) return;
+      const [moved] = queue.splice(dragSrcIdx, 1);
+      queue.splice(dst, 0, moved);
+      dragSrcIdx = null; renderQueue();
+    });
     box.appendChild(el);
   });
 }
@@ -797,7 +823,8 @@ async function fetchAutomix(videoId) {
       pick = pipedToVid(items[Math.floor(Math.random()*Math.min(items.length,6))]);
     }
     if (pick?.id) { playVideo(pick); toast('Automix: playing related video'); }
-  } catch {}
+    else toast('Automix: no related videos found');
+  } catch { toast('Automix unavailable — queue a video manually or sign in for Search'); }
 }
 async function fetchChannel(channelId) {
   const box = document.getElementById('channel-list'); box.innerHTML = '<div class="empty">Loading...</div>';
@@ -812,7 +839,10 @@ function renderVidList(box, items) {
   items.forEach(v => {
     if (!v.id) return;
     const el = document.createElement('div'); el.className = 'v-item' + (current?.id===v.id?' now':'');
-    el.innerHTML = `<img class="vt" src="${esc(v.thumbnail)}" loading="lazy" alt=""><div class="vi2"><div class="vtt">${esc(v.title)}</div><div class="vch">${esc(v.channelTitle||'')}</div></div>`;
+    el.innerHTML = `<img class="vt" src="${esc(v.thumbnail)}" loading="lazy" alt=""><div class="vi2"><div class="vtt">${esc(v.title)}</div><div class="vch">${esc(v.channelTitle||'')}</div></div><div class="v-acts"><button class="mb">+Q</button><button class="mb">+PL</button></div>`;
+    const [btnQ, btnPL] = el.querySelectorAll('.mb');
+    btnQ.onclick  = e => { e.stopPropagation(); addToQueue(v); };
+    btnPL.onclick = e => { e.stopPropagation(); openAddPl(v); };
     el.onclick = () => playVideo(v); box.appendChild(el);
   });
 }
@@ -883,7 +913,8 @@ function prevVid()       { if(ready) player.seekTo(0); }
 function nextVid()       { queue.length?popQueue():(automix&&current?fetchAutomix(current.id):toast('Queue is empty')); }
 function toggleShuffle() { shuffle=!shuffle; document.getElementById('shuf-btn').classList.toggle('lit',shuffle); toast(shuffle?'Shuffle on':'Shuffle off'); }
 function toggleRepeat()  { repeat=!repeat;  document.getElementById('rep-btn').classList.toggle('lit',repeat);  toast(repeat?'Repeat on':'Repeat off'); }
-function toggleAutomix() { automix=!automix; document.getElementById('automix-btn').classList.toggle('lit',automix); toast(automix?'Automix on':'Automix off'); }
+function toggleAutomix() { automix=!automix; document.getElementById('automix-btn').classList.toggle('lit',automix); toast(automix?'Automix on — plays related when queue ends':'Automix off'); }
+function toggleNorm()   { normalize=!normalize; document.getElementById('norm-btn').classList.toggle('lit',normalize); toast(normalize?'Normalize on — resets volume to 80 on each track':'Normalize off'); }
 function setVol(v)       { if(ready) player.setVolume(+v); }
 function seekClick(e)    { if(!ready) return; const r=document.getElementById('prog').getBoundingClientRect(); player.seekTo(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(player.getDuration()||0)); }
 
