@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AQUATUNE</title><!-- CHANGE APP NAME: also update APP_NAME constant in the script below -->
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     :root {
       --bg:         #010d20;
@@ -83,12 +84,32 @@
     }
     .k { background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,0.18);
          border-radius:4px; padding:1px 5px; font-family:monospace; font-size:9px; }
-    #api-btn {
-      background: var(--panel-bg); border: 1px solid var(--border2);
-      color: var(--text2); padding: 5px 12px; border-radius: var(--r-btn);
-      cursor: pointer; font-size: 11px; transition: all .2s; white-space: nowrap;
+    /* auth area */
+    #auth-area { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    #signin-btn {
+      background: linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+      border: 1px solid var(--border2); border-radius: var(--r-btn);
+      color: var(--text); padding: 6px 14px; cursor: pointer;
+      font-size: 11px; font-weight: 600; transition: all .2s; white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
     }
-    #api-btn:hover { background:rgba(0,110,255,0.3); color:var(--text); border-color:var(--accent); }
+    #signin-btn:hover { background:rgba(0,110,255,0.3); border-color:var(--accent); box-shadow:0 0 10px var(--glow); }
+    #signin-btn svg { width:14px; height:14px; flex-shrink:0; }
+    #user-info { display:none; align-items:center; gap:7px; }
+    #user-avatar { width:26px; height:26px; border-radius:50%; border:1px solid var(--border2); object-fit:cover; }
+    #user-name { font-size:11px; color:var(--text2); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #signout-btn {
+      background: var(--panel-bg); border:1px solid var(--border);
+      color:var(--text2); padding:4px 10px; border-radius:var(--r-btn);
+      cursor:pointer; font-size:10px; transition:all .2s;
+    }
+    #signout-btn:hover { color:rgba(255,100,100,0.9); border-color:rgba(255,100,100,0.4); }
+    #client-id-btn {
+      background: var(--panel-bg); border: 1px solid var(--border);
+      color: var(--text2); padding: 4px 8px; border-radius: var(--r-btn);
+      cursor: pointer; font-size: 10px; transition: all .2s; white-space: nowrap;
+    }
+    #client-id-btn:hover { background:rgba(0,110,255,0.25); color:var(--text); }
 
     /* ── THREE-COLUMN MAIN ───────────────────────── */
     #main {
@@ -434,7 +455,23 @@
       <span class="k">↑↓</span>volume
       <span class="k">M</span>mute
     </div>
-    <button id="api-btn" onclick="openModal('key-modal')">⚙ API Key</button>
+    <div id="auth-area">
+      <button id="client-id-btn" onclick="openModal('cid-modal')" title="Set OAuth Client ID">⚙</button>
+      <button id="signin-btn" onclick="signIn()">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </button>
+      <div id="user-info">
+        <img id="user-avatar" src="" alt="">
+        <span id="user-name"></span>
+        <button id="signout-btn" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
   </div>
 
   <!-- MAIN -->
@@ -542,19 +579,23 @@
 
 <!-- MODALS -->
 
-<!-- API key -->
-<div class="ov" id="key-modal">
+<!-- OAuth Client ID -->
+<div class="ov" id="cid-modal">
   <div class="modal">
-    <h3>⚙ YouTube Data API Key</h3>
-    <input class="m-inp" id="key-inp" type="text" placeholder="AIzaSy…">
+    <h3>⚙ Google OAuth Client ID</h3>
+    <input class="m-inp" id="cid-inp" type="text" placeholder="123456789-abc….apps.googleusercontent.com"
+           onkeydown="if(event.key==='Enter')saveClientId()">
     <p class="m-hint">
-      Get a free key: <strong>Google Cloud Console</strong> → APIs &amp; Services
-      → Enable <em>YouTube Data API v3</em> → Credentials → Create API Key.<br><br>
-      Your key is stored only in your browser's localStorage and is never sent anywhere except to YouTube's API.
+      <strong>One-time setup in Google Cloud Console:</strong><br>
+      1. Go to <em>APIs &amp; Services → Credentials</em><br>
+      2. Create an <em>OAuth 2.0 Client ID</em> (Web application)<br>
+      3. Add your page's origin to <em>Authorised JavaScript origins</em><br>
+      4. Enable the <em>YouTube Data API v3</em><br><br>
+      Your Client ID is stored in localStorage. No client secret is needed or used.
     </p>
     <div class="m-acts">
-      <button class="mbtn s" onclick="closeModal('key-modal')">Cancel</button>
-      <button class="mbtn p" onclick="saveKey()">Save</button>
+      <button class="mbtn s" onclick="closeModal('cid-modal')">Cancel</button>
+      <button class="mbtn p" onclick="saveClientId()">Save &amp; Continue</button>
     </div>
   </div>
 </div>
@@ -599,7 +640,11 @@ document.getElementById('logo').textContent = APP_NAME;
 // ═══════════════════════════════════════════════════════════
 let player       = null;
 let ready        = false;
-let apiKey       = localStorage.getItem('yt_api_key') || '';
+let clientId     = localStorage.getItem('yt_client_id') || '';
+let accessToken  = null;   // never persisted — memory only
+let tokenClient  = null;   // GIS token client instance
+let tokenExpiry  = 0;      // epoch ms when current token expires
+let pendingCall  = null;   // fn to retry after token refresh
 let current      = null;   // { id, title, channelTitle, channelId, thumbnail }
 let queue        = [];
 let playlists    = JSON.parse(localStorage.getItem('yt_pls') || '[]');
@@ -677,14 +722,14 @@ function playVideo(v) {
   th.src = v.thumbnail || '';
   th.style.display = v.thumbnail ? 'block' : 'none';
   renderQueue();
-  if (apiKey) { fetchRelated(v.id); if (v.channelId) fetchChannel(v.channelId); }
+  if (accessToken) { fetchRelated(v.id); if (v.channelId) fetchChannel(v.channelId); }
 }
 
 // ═══════════════════════════════════════════════════════════
 //  SEARCH
 // ═══════════════════════════════════════════════════════════
 async function doSearch() {
-  if (!apiKey) { openModal('key-modal'); return; }
+  if (!accessToken) { signIn(); return; }
   const q = document.getElementById('q').value.trim();
   if (!q) return;
   const box = document.getElementById('results');
@@ -770,7 +815,7 @@ function saveQueuePl() {
 //  RELATED VIDEOS
 // ═══════════════════════════════════════════════════════════
 async function fetchRelated(videoId) {
-  if (!apiKey) return;
+  if (!accessToken) return;
   const box = document.getElementById('related-list');
   box.innerHTML = '<div class="empty"><div class="e-ico">⏳</div>Loading…</div>';
   let items;
@@ -789,7 +834,7 @@ async function fetchRelated(videoId) {
 }
 
 async function fetchAutomix(videoId) {
-  if (!apiKey) return;
+  if (!accessToken) return;
   let items;
   try {
     const d = await ytApi('search', { part:'snippet', relatedToVideoId:videoId, type:'video', maxResults:6 });
@@ -811,7 +856,7 @@ async function fetchAutomix(videoId) {
 //  CHANNEL VIDEOS
 // ═══════════════════════════════════════════════════════════
 async function fetchChannel(channelId) {
-  if (!apiKey) return;
+  if (!accessToken) return;
   const box = document.getElementById('channel-list');
   box.innerHTML = '<div class="empty"><div class="e-ico">⏳</div>Loading channel…</div>';
   try {
@@ -1003,24 +1048,98 @@ function switchTab(name, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  API KEY
+//  OAUTH / GOOGLE IDENTITY SERVICES
 // ═══════════════════════════════════════════════════════════
-function saveKey() {
-  apiKey = document.getElementById('key-inp').value.trim();
-  localStorage.setItem('yt_api_key', apiKey);
-  closeModal('key-modal');
-  toast('API key saved ✓');
+function saveClientId() {
+  clientId = document.getElementById('cid-inp').value.trim();
+  localStorage.setItem('yt_client_id', clientId);
+  closeModal('cid-modal');
+  toast('Client ID saved — click Sign in with Google');
+  initTokenClient();
 }
+
+function initTokenClient() {
+  if (!clientId || typeof google === 'undefined') return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/youtube.readonly openid profile email',
+    callback: onTokenResponse,
+    error_callback: err => {
+      toast('Sign-in failed: ' + (err.type || err.message || 'unknown error'));
+    },
+  });
+}
+
+function onTokenResponse(resp) {
+  if (resp.error) { toast('Sign-in error: ' + resp.error); return; }
+  accessToken = resp.access_token;
+  // Google tokens last 3600s; subtract 60s buffer
+  tokenExpiry = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
+  fetchUserInfo();
+  // Retry any call that was waiting on a fresh token
+  if (pendingCall) { const fn = pendingCall; pendingCall = null; fn(); }
+}
+
+async function fetchUserInfo() {
+  try {
+    const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const u = await r.json();
+    document.getElementById('signin-btn').style.display = 'none';
+    const info = document.getElementById('user-info');
+    info.style.display = 'flex';
+    const av = document.getElementById('user-avatar');
+    if (u.picture) { av.src = u.picture; av.style.display = 'block'; } else { av.style.display = 'none'; }
+    document.getElementById('user-name').textContent = u.given_name || u.name || u.email || '';
+    toast(`Signed in as ${u.name || u.email} ✓`);
+  } catch { /* non-fatal — signed in but no profile shown */ }
+}
+
+function signIn() {
+  if (!clientId) { openModal('cid-modal'); return; }
+  if (!tokenClient) { initTokenClient(); }
+  // prompt:'' = silent if previously consented, popup only when needed
+  tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+}
+
+function signOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
+  accessToken = null;
+  tokenExpiry = 0;
+  document.getElementById('signin-btn').style.display = '';
+  document.getElementById('user-info').style.display = 'none';
+  toast('Signed out');
+}
+
+// Called when the GIS library finishes loading
+window.onGoogleLibraryLoad = () => { if (clientId) initTokenClient(); };
 
 // ═══════════════════════════════════════════════════════════
 //  YOUTUBE DATA API HELPER
 // ═══════════════════════════════════════════════════════════
 async function ytApi(ep, params) {
-  if (!apiKey) throw new Error('No API key — click ⚙ API Key to add one');
+  if (!accessToken) throw new Error('Not signed in — click Sign in with Google');
+  // Refresh token if expired
+  if (Date.now() > tokenExpiry) {
+    await new Promise(resolve => {
+      pendingCall = resolve;
+      tokenClient.requestAccessToken({ prompt: '' });
+    });
+  }
   const u = new URL(`https://www.googleapis.com/youtube/v3/${ep}`);
-  u.searchParams.set('key', apiKey);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-  const r = await fetch(u.toString());
+  const r = await fetch(u.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  // 401 means token was rejected — try one silent refresh then retry
+  if (r.status === 401) {
+    await new Promise(resolve => { pendingCall = resolve; tokenClient.requestAccessToken({ prompt: '' }); });
+    const r2 = await fetch(u.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+    const j2 = await r2.json();
+    if (!r2.ok) throw new Error(j2.error?.message || `API error ${r2.status}`);
+    return j2;
+  }
   const j = await r.json();
   if (!r.ok) throw new Error(j.error?.message || `API error ${r.status}`);
   return j;
@@ -1042,7 +1161,10 @@ function snToVid(item) {
 // ═══════════════════════════════════════════════════════════
 function openModal(id) {
   document.getElementById(id).classList.add('show');
-  if (id === 'key-modal') { document.getElementById('key-inp').value = apiKey; setTimeout(() => document.getElementById('key-inp').focus(), 80); }
+  if (id === 'cid-modal') {
+    document.getElementById('cid-inp').value = clientId;
+    setTimeout(() => document.getElementById('cid-inp').focus(), 80);
+  }
 }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 document.querySelectorAll('.ov').forEach(el => el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); }));
@@ -1091,7 +1213,8 @@ function esc(s) {
 //  INIT
 // ═══════════════════════════════════════════════════════════
 renderPls();
-if (!apiKey) setTimeout(() => toast('Welcome! Set your YouTube API key via ⚙ to get started'), 900);
+if (!clientId) setTimeout(() => toast('Welcome! Click ⚙ to set your OAuth Client ID, then Sign in'), 900);
+else setTimeout(() => toast('Click "Sign in with Google" to get started'), 900);
 
 const s = document.createElement('script');
 s.src = 'https://www.youtube.com/iframe_api';
