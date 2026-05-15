@@ -1153,6 +1153,32 @@ function saveQueuePl() {
 // ─────────────────────────────────────────────────────────
 //  RELATED / AUTOMIX / CHANNEL
 // ─────────────────────────────────────────────────────────
+
+// Strip upload-variant noise so "Song (Official Video)" and "Song [Lyrics]"
+// compare as the same track.
+function coreTitle(title) {
+  return title
+    .replace(/\(.*?\)|\[.*?\]/g, '')
+    .replace(/[-–—|·•,!?'"]/g, ' ')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+function titleTooSimilar(a, b) {
+  const ca = coreTitle(a), cb = coreTitle(b);
+  if (!ca || !cb) return false;
+  // Exact match after stripping
+  if (ca === cb) return true;
+  // One is a prefix of the other (covers "Song Name - Artist" vs "Song Name")
+  const shorter = ca.length < cb.length ? ca : cb;
+  const longer  = ca.length < cb.length ? cb : ca;
+  if (shorter.length >= 6 && longer.startsWith(shorter)) return true;
+  // Word-overlap ≥ 60% (catches re-uploads with slightly different titles)
+  const wa = ca.split(' ').filter(w => w.length > 2);
+  const wb = new Set(cb.split(' ').filter(w => w.length > 2));
+  if (!wa.length || !wb.size) return false;
+  const overlap = wa.filter(w => wb.has(w)).length;
+  return overlap / Math.max(wa.length, wb.size) >= 0.6;
+}
+
 async function fetchRelated(videoId) {
   const box = document.getElementById('related-list'); box.innerHTML = '<div class="empty">Loading...</div>';
   try {
@@ -1163,18 +1189,27 @@ async function fetchRelated(videoId) {
 }
 async function fetchAutomix(videoId) {
   try {
+    // Build a set of recently-heard titles to avoid re-uploading duplicates
+    const recentTitles = sessionHistory.slice(0, 20).map(v => v.title);
+    function isStale(v) {
+      if (!v?.id || v.id === videoId) return true;
+      return recentTitles.some(t => titleTooSimilar(t, v.title));
+    }
+
     let pick;
     if (useGoogle && accessToken) {
-      const d = await ytApi('search',{part:'snippet',q:(current?.title||'').split(' ').slice(0,5).join(' '),type:'video',videoCategoryId:'10',maxResults:8});
-      const items=(d.items||[]).map(snToVid).filter(v=>v.id&&v.id!==videoId); if (!items.length) return;
-      pick=items[Math.floor(Math.random()*items.length)];
+      const d = await ytApi('search',{part:'snippet',q:(current?.title||'').split(' ').slice(0,5).join(' '),type:'video',videoCategoryId:'10',maxResults:12});
+      const items=(d.items||[]).map(snToVid).filter(v=>!isStale(v));
+      if (!items.length) return;
+      pick = items[Math.floor(Math.random() * items.length)];
     } else {
       const d = await pipedRace(`streams/${videoId}`);
-      const items=(d.relatedStreams||[]).filter(r=>r.type==='stream'&&r.url); if (!items.length) return;
-      pick=pipedToVid(items[Math.floor(Math.random()*Math.min(items.length,6))]);
+      const items = (d.relatedStreams||[]).filter(r => r.url || r.videoId).map(pipedToVid).filter(v => !isStale(v));
+      if (!items.length) return;
+      pick = items[Math.floor(Math.random() * Math.min(items.length, 8))];
     }
     if (pick?.id) { playVideo(pick); toast('Automix: playing related video'); }
-    else toast('Automix: no related videos found');
+    else toast('Automix: no new related videos found');
   } catch { toast('Automix unavailable'); }
 }
 async function fetchChannel(channelId) {
