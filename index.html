@@ -904,6 +904,8 @@ window.addEventListener('beforeunload', saveSession);
 // ─────────────────────────────────────────────────────────
 //  YOUTUBE IFRAME API
 // ─────────────────────────────────────────────────────────
+let pendingPlay = null;
+
 window.onYouTubeIframeAPIReady = () => {
   player = new YT.Player('yt-player', {
     height: '100%', width: '100%',
@@ -911,12 +913,14 @@ window.onYouTubeIframeAPIReady = () => {
     events: {
       onReady: e => {
         ready = true;
-        const vol = +document.getElementById('vol').value;
-        e.target.setVolume(vol);
-        if (current?.id) {
+        e.target.setVolume(+document.getElementById('vol').value);
+        if (pendingPlay) {
+          const v = pendingPlay; pendingPlay = null;
+          playVideo(v);
+        } else if (current?.id) {
           player.loadVideoById(current.id);
           player.pauseVideo();
-          setTimeout(() => { if (ready && restoredTime > 3) player.seekTo(restoredTime - 3); }, 1200);
+          setTimeout(() => { if (restoredTime > 3) player.seekTo(restoredTime - 3); }, 1200);
         }
       },
       onStateChange: onState,
@@ -954,7 +958,7 @@ function startProg() {
 //  PLAY VIDEO
 // ─────────────────────────────────────────────────────────
 function playVideo(v) {
-  if (!ready) { toast('Player not ready yet'); return; }
+  if (!ready) { pendingPlay = v; return; }
   current = v;
   document.getElementById('ph').style.display = 'none';
   player.loadVideoById(v.id);
