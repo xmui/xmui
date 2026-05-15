@@ -607,13 +607,24 @@ document.getElementById('logo').textContent = APP_NAME;
 // ─────────────────────────────────────────────────────────
 //  PIPED
 // ─────────────────────────────────────────────────────────
-const PIPED = [
-  'https://pipedapi.kavin.rocks',    'https://api.piped.video',
-  'https://pipedapi.leptons.xyz',    'https://pipedapi.nosebs.ru',
-  'https://api.piped.yt',            'https://pipedapi.drgns.space',
-  'https://pipedapi.owo.si',         'https://pipedapi.ducks.party',
-  'https://api.piped.private.coffee','https://pipedapi.darkness.services',
+let PIPED = [
+  'https://pipedapi.kavin.rocks',     'https://api.piped.video',
+  'https://pipedapi.leptons.xyz',     'https://api.piped.yt',
+  'https://pipedapi.owo.si',          'https://pipedapi.ducks.party',
+  'https://api.piped.private.coffee', 'https://pipedapi.darkness.services',
+  'https://watchapi.whatever.social', 'https://api.piped.projectsegfau.lt',
+  'https://piped-api.codespace.icu',  'https://piped.syncpundit.io',
+  'https://api.piped.adminforge.de',  'https://piped-api.garudalinux.org',
 ];
+async function refreshPipedInstances() {
+  try {
+    const r = await fetch('https://piped-instances.kavin.rocks/', { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return;
+    const list = await r.json();
+    const fresh = list.filter(i => i.api_url).map(i => i.api_url.replace(/\/$/, '')).slice(0, 16);
+    if (fresh.length >= 4) PIPED.splice(0, PIPED.length, ...fresh);
+  } catch {}
+}
 async function pipedRace(path, params = {}) {
   const qs = new URLSearchParams(params).toString();
   const suffix = qs ? `?${qs}` : '';
@@ -1497,6 +1508,7 @@ restoreSession();
 renderPls();
 if (clientId) document.getElementById('cid-inp').value = clientId;
 tryAutoSignIn();
+refreshPipedInstances();
 const _s=document.createElement('script');_s.src='https://www.youtube.com/iframe_api';document.head.appendChild(_s);
 </script>
 </body>
