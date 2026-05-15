@@ -714,12 +714,20 @@ function initTokenClient() {
     client_id: clientId,
     scope: 'https://www.googleapis.com/auth/youtube.readonly openid profile email',
     callback: onTokenResponse,
-    error_callback: err => { if (err.type === 'popup_closed' || err.type === 'user_cancelled') return; console.warn('GIS error', err); },
+    error_callback: err => {
+      if (err.type === 'popup_closed' || err.type === 'user_cancelled') return;
+      // Silent auth failed — fall back to full consent flow
+      if (!accessToken) {
+        localStorage.removeItem('yt_authed');
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      }
+    },
   });
 }
 function onTokenResponse(resp) {
   if (resp.error) { toast('Sign-in error: ' + resp.error); return; }
   accessToken = resp.access_token; tokenExpiry = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
+  localStorage.setItem('yt_authed', '1');
   useGoogle = true;
   document.getElementById('google-btn').classList.add('active');
   fetchUserInfo(); if (pendingCall) { const fn = pendingCall; pendingCall = null; fn(); }
@@ -736,17 +744,25 @@ async function fetchUserInfo() {
     toast(`Signed in as ${u.name || u.email}`);
   } catch {}
 }
-function signIn() { if (!clientId) { openModal('cid-modal'); return; } if (!tokenClient) initTokenClient(); tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' }); }
+function signIn() {
+  if (!clientId) { openModal('cid-modal'); return; }
+  if (!tokenClient) initTokenClient();
+  // Use silent prompt if previously authorized; consent only on first use
+  const prevAuth = localStorage.getItem('yt_authed') === '1';
+  tokenClient.requestAccessToken({ prompt: prevAuth ? '' : 'consent' });
+}
 function signOut() {
   if (accessToken) try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch {}
   accessToken = null; tokenExpiry = 0; useGoogle = false;
+  localStorage.removeItem('yt_authed');
   document.getElementById('google-btn').classList.remove('active');
   document.getElementById('google-btn').style.display = 'flex';
   document.getElementById('user-chip').style.display = 'none';
   toast('Signed out');
 }
 async function tryAutoSignIn() {
-  if (!clientId) return;
+  // Only attempt auto sign-in if previously authorized; avoids surprise popups
+  if (!clientId || localStorage.getItem('yt_authed') !== '1') return;
   const s = document.createElement('script');
   s.src = 'https://accounts.google.com/gsi/client';
   s.onload = () => {
