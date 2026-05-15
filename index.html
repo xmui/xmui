@@ -514,12 +514,6 @@
       <span style="font-size:10px;color:var(--text2)">Pick any accent color</span>
     </div>
   </div>
-  <div class="theme-section">
-    <div class="theme-label">Last.fm API Key</div>
-    <input type="text" id="lastfm-key-inp" class="m-inp" placeholder="Paste key for artist info..." style="margin-bottom:6px;">
-    <button class="mbtn p" onclick="saveLastfmKey()" style="width:100%;font-size:11px;padding:6px 0;">Save Key</button>
-    <div style="font-size:9px;color:var(--text2);margin-top:6px;">Free key at <a href="https://www.last.fm/api/account/create" target="_blank" rel="noopener" style="color:var(--accent)">last.fm/api</a> — enables artist bios</div>
-  </div>
 </div>
 
 <!-- MODALS -->
@@ -722,14 +716,7 @@ function initTokenClient() {
     client_id: clientId,
     scope: 'https://www.googleapis.com/auth/youtube.readonly openid profile email',
     callback: onTokenResponse,
-    error_callback: err => {
-      if (err.type === 'popup_closed' || err.type === 'user_cancelled') return;
-      // Silent auth failed — fall back to full consent flow
-      if (!accessToken) {
-        localStorage.removeItem('yt_authed');
-        tokenClient.requestAccessToken({ prompt: 'consent' });
-      }
-    },
+    error_callback: () => {},
   });
 }
 function onTokenResponse(resp) {
@@ -755,9 +742,7 @@ async function fetchUserInfo() {
 function signIn() {
   if (!clientId) { openModal('cid-modal'); return; }
   if (!tokenClient) initTokenClient();
-  // Use silent prompt if previously authorized; consent only on first use
-  const prevAuth = localStorage.getItem('yt_authed') === '1';
-  tokenClient.requestAccessToken({ prompt: prevAuth ? '' : 'consent' });
+  tokenClient.requestAccessToken({ prompt: 'consent' });
 }
 function signOut() {
   if (accessToken) try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch {}
@@ -1132,16 +1117,9 @@ function saveQueuePl() {
 async function fetchRelated(videoId) {
   const box = document.getElementById('related-list'); box.innerHTML = '<div class="empty">Loading...</div>';
   try {
-    if (useGoogle && accessToken) {
-      let items;
-      try { const d = await ytApi('search',{part:'snippet',relatedToVideoId:videoId,type:'video',videoCategoryId:'10',maxResults:15}); items=(d.items||[]).map(snToVid); }
-      catch { const d2 = await ytApi('search',{part:'snippet',q:(current?.title||'').split(' ').slice(0,5).join(' '),type:'video',videoCategoryId:'10',maxResults:15}); items=(d2.items||[]).map(snToVid); }
-      renderVidList(box, items);
-    } else {
-      const d = await pipedRace(`streams/${videoId}`);
-      const items = (d.relatedStreams||[]).filter(r=>r.type==='stream').slice(0,15).map(pipedToVid);
-      renderVidList(box, items);
-    }
+    const d = await pipedRace(`streams/${videoId}`);
+    const items = (d.relatedStreams || []).filter(r => r.url || r.videoId).slice(0, 15).map(pipedToVid).filter(v => v.id);
+    renderVidList(box, items);
   } catch { box.innerHTML = '<div class="empty">Related unavailable</div>'; }
 }
 async function fetchAutomix(videoId) {
@@ -1163,8 +1141,9 @@ async function fetchAutomix(videoId) {
 async function fetchChannel(channelId) {
   const box = document.getElementById('channel-list'); box.innerHTML = '<div class="empty">Loading...</div>';
   try {
-    if (useGoogle && accessToken) { const d=await ytApi('search',{part:'snippet',channelId,type:'video',maxResults:20,order:'date'}); renderVidList(box,(d.items||[]).map(snToVid)); }
-    else { const d=await pipedRace(`channel/${channelId}`); renderVidList(box,(d.relatedStreams||[]).slice(0,20).map(pipedToVid)); }
+    const d = await pipedRace(`channel/${channelId}`);
+    const items = (d.relatedStreams || []).filter(r => r.url || r.videoId).slice(0, 20).map(pipedToVid).filter(v => v.id);
+    renderVidList(box, items);
   } catch { box.innerHTML='<div class="empty">Channel unavailable</div>'; }
 }
 function renderVidList(box, items) {
