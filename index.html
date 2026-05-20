@@ -889,7 +889,7 @@ let sessionHistory = [];
 let searchMode = 'videos';
 let restoredTime = 0;
 let infoExpanded = false;
-let discState = { view:'artists', artist:null, rels:null, albums:null, album:null, ytResults:null };
+let discState = { view:'artists', artist:null, rels:null, albums:null, albumsType:'albums', album:null, ytResults:null };
 const discArtistCache = new Map(); // lc name → {artist, rels}
 const discAlbumsCache = new Map(); // mbid → albums[]
 let discGen = 0;
@@ -1219,108 +1219,105 @@ async function mbFetch(path) {
 
 async function fetchRelated(videoId) {
   const gen = ++discGen;
-  const { artist: artistName } = parseTitle(current?.title || '');
-  const artistQuery = (artistName || current?.channelTitle || '')
-    .replace(/\s*(vevo|official|music|records|topic)\s*/gi, '').trim();
+  const currentCh = (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim().toLowerCase();
 
-  Object.assign(discState, { view:'artists', artist:null, rels:null, albums:null, album:null, ytResults:null });
+  Object.assign(discState, { view:'artists', artist:null, rels:null, albums:null, albumsType:'albums', album:null, ytResults:null });
   renderDiscNav();
 
   const box = document.getElementById('related-list');
-  if (!artistQuery || artistQuery.length < 2) {
-    box.innerHTML = '<div class="empty">Play a video to discover related artists</div>';
-    return;
-  }
-
-  box.innerHTML = `<div class="empty" id="disc-load">Finding artists related to <strong>${esc(artistQuery)}</strong>…</div>`;
+  box.innerHTML = '<div class="empty">Finding related artists…</div>';
 
   try {
-    const cacheKey = artistQuery.toLowerCase();
-    if (discArtistCache.has(cacheKey)) {
-      if (discGen !== gen) return;
-      Object.assign(discState, discArtistCache.get(cacheKey));
-      renderDiscView(); return;
-    }
-
-    // 1. Find artist MBID
-    const d1 = await mbFetch(`artist?query=${encodeURIComponent(artistQuery)}&limit=3&fmt=json`);
-    if (discGen !== gen) return;
-    const mb = d1.artists?.[0];
-    if (!mb) { box.innerHTML = '<div class="empty">Artist not found in music database</div>'; return; }
-
-    const artist = { name: mb.name, mbid: mb.id };
-    discState.artist = artist;
-    const loadEl = document.getElementById('disc-load');
-    if (loadEl) loadEl.innerHTML = `Found <strong>${esc(mb.name)}</strong> — loading related artists…`;
-
-    // 2. Fetch artist rels + tags in one call
-    const d2 = await mbFetch(`artist/${mb.id}?inc=artist-rels+tags&fmt=json`);
+    // Pull Piped related streams — YouTube's own similarity graph, always populated
+    const d = await pipedRace(`streams/${videoId}`);
     if (discGen !== gen) return;
 
-    let rels = (d2.relations || [])
-      .filter(r => r['target-type'] === 'artist' && r.artist)
-      .map(r => ({ name: r.artist.name, mbid: r.artist.id, relType: r.type }))
-      .filter((a, i, arr) => arr.findIndex(x => x.mbid === a.mbid) === i)
-      .slice(0, 12);
+    const streams = (d.relatedStreams || []).filter(r => (r.url || r.videoId) && r.uploaderName);
 
-    // Pad with tag-based similar artists if too few rels
-    if (rels.length < 4) {
-      const topTag = (d2.tags || []).sort((a, b) => b.count - a.count)[0]?.name;
-      if (topTag) {
-        if (loadEl) loadEl.textContent = `Searching ${topTag} artists…`;
-        try {
-          const d3 = await mbFetch(`artist?tag=${encodeURIComponent(topTag)}&limit=14&fmt=json`);
-          if (discGen !== gen) return;
-          const seen = new Set(rels.map(r => r.mbid));
-          seen.add(mb.id);
-          for (const a of (d3.artists || [])) {
-            if (!seen.has(a.id)) { rels.push({ name: a.name, mbid: a.id, relType: topTag }); seen.add(a.id); }
-            if (rels.length >= 10) break;
-          }
-        } catch {}
-      }
-    }
+    // Deduplicate by channel; frequency = relevance signal
+    const seen = new Map();
+    streams.forEach(r => {
+      const chId = r.uploaderUrl?.match(/\/channel\/([^/]+)/)?.[1] || '';
+      const name = decodeHtml(r.uploaderName || '').replace(/\s*-\s*topic$/i, '').trim();
+      if (!name || name.toLowerCase() === currentCh) return;
+      const key = chId || name.toLowerCase();
+      if (seen.has(key)) seen.get(key).count++;
+      else seen.set(key, { name, channelId: chId, count: 1 });
+    });
 
-    discState.rels = rels;
-    discArtistCache.set(cacheKey, { artist, rels });
+    const artists = [...seen.values()].sort((a, b) => b.count - a.count).slice(0, 12);
+
+    if (!artists.length) { box.innerHTML = '<div class="empty">No related artists found</div>'; return; }
+
+    discState.artist = { name: (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim() };
+    discState.rels = artists;
     if (discGen !== gen) return;
     renderDiscView();
 
   } catch(e) {
     if (discGen !== gen || e.name === 'AbortError') return;
-    const msg = e.status === 429 ? 'Rate limited — try again in a moment' : 'Music database unavailable';
-    box.innerHTML = `<div class="empty">${msg}</div>`;
+    box.innerHTML = '<div class="empty">Discovery unavailable</div>';
   }
 }
 
 async function discSelectArtist(artist) {
   discState.view = 'albums';
   discState.artist = artist;
-  discState.albums = null; discState.album = null; discState.ytResults = null;
+  discState.albums = null; discState.albumsType = 'albums'; discState.album = null; discState.ytResults = null;
   renderDiscNav();
 
-  if (discAlbumsCache.has(artist.mbid)) {
-    discState.albums = discAlbumsCache.get(artist.mbid);
+  const cacheKey = artist.name.toLowerCase();
+  if (discAlbumsCache.has(cacheKey)) {
+    Object.assign(discState, discAlbumsCache.get(cacheKey));
     renderDiscView(); return;
   }
 
   const box = document.getElementById('related-list');
-  box.innerHTML = `<div class="empty">Loading albums by <strong>${esc(artist.name)}</strong>…</div>`;
+  box.innerHTML = `<div class="empty">Loading releases for <strong>${esc(artist.name)}</strong>…</div>`;
 
   try {
-    const d = await mbFetch(`release-group?artist=${artist.mbid}&type=album&fmt=json&limit=25`);
-    const albums = (d['release-groups'] || [])
-      .map(rg => ({ mbid: rg.id, title: rg.title, year: rg['first-release-date']?.slice(0, 4) || '' }))
-      .sort((a, b) => (b.year || '0').localeCompare(a.year || '0'));
-    discState.albums = albums;
-    discAlbumsCache.set(artist.mbid, albums);
-    renderDiscView();
+    // MusicBrainz: find MBID then grab albums (2 throttled calls)
+    const d1 = await mbFetch(`artist?query=${encodeURIComponent(artist.name)}&limit=3&fmt=json`);
+    const mb = d1.artists?.[0];
+
+    if (mb) {
+      const d2 = await mbFetch(`release-group?artist=${mb.id}&type=album&fmt=json&limit=25`);
+      const albums = (d2['release-groups'] || [])
+        .map(rg => ({ mbid: rg.id, title: rg.title, year: rg['first-release-date']?.slice(0, 4) || '' }))
+        .sort((a, b) => (b.year || '0').localeCompare(a.year || '0'));
+
+      if (albums.length) {
+        discState.artist = { ...artist, mbid: mb.id, name: mb.name };
+        discState.albums = albums; discState.albumsType = 'albums';
+        discAlbumsCache.set(cacheKey, { albums, albumsType: 'albums', artist: discState.artist });
+        renderDiscView(); return;
+      }
+    }
   } catch(e) {
-    if (e.name !== 'AbortError') document.getElementById('related-list').innerHTML = '<div class="empty">Albums unavailable</div>';
+    if (e.name === 'AbortError') return;
+    // Fall through to Piped channel fallback
+  }
+
+  // Fallback: channel videos via Piped (no MusicBrainz data or no albums found)
+  if (artist.channelId) {
+    box.innerHTML = `<div class="empty">Loading videos by <strong>${esc(artist.name)}</strong>…</div>`;
+    try {
+      const d = await pipedRace(`channel/${artist.channelId}`);
+      const videos = (d.relatedStreams || []).filter(r => r.url || r.videoId).slice(0, 20).map(pipedToVid).filter(v => v.id);
+      discState.albums = videos.map(v => ({ title: v.title, year: '', ytVideo: v }));
+      discState.albumsType = 'videos';
+      discAlbumsCache.set(cacheKey, { albums: discState.albums, albumsType: 'videos', artist });
+      renderDiscView();
+    } catch { box.innerHTML = '<div class="empty">Could not load releases</div>'; }
+  } else {
+    box.innerHTML = '<div class="empty">No releases found</div>';
   }
 }
 
 async function discSelectAlbum(album) {
+  // Direct video (Piped channel fallback) — just play it
+  if (album.ytVideo) { playVideo(album.ytVideo); return; }
+
   discState.view = 'album-yt';
   discState.album = album; discState.ytResults = null;
   renderDiscNav();
@@ -1359,12 +1356,12 @@ function renderDiscView() {
     box.innerHTML = '';
     if (!discState.rels?.length) { box.innerHTML = '<div class="empty">No related artists found</div>'; return; }
     const hdr = document.createElement('span'); hdr.className = 'disc-sec';
-    hdr.textContent = `Related to ${discState.artist?.name || ''}`;
+    hdr.textContent = `Related to ${discState.artist?.name || 'current track'}`;
     box.appendChild(hdr);
     const grid = document.createElement('div'); grid.className = 'artist-grid';
     discState.rels.forEach(a => {
       const card = document.createElement('div'); card.className = 'artist-card';
-      card.innerHTML = `<div class="a-av">${esc(a.name[0].toUpperCase())}</div><div class="a-name" title="${esc(a.name)}">${esc(a.name)}</div><div class="a-rel">${esc(a.relType || '')}</div>`;
+      card.innerHTML = `<div class="a-av">${esc(a.name[0].toUpperCase())}</div><div class="a-name" title="${esc(a.name)}">${esc(a.name)}</div>`;
       card.onclick = () => discSelectArtist(a);
       grid.appendChild(card);
     });
@@ -1373,20 +1370,29 @@ function renderDiscView() {
 
   if (discState.view === 'albums') {
     box.innerHTML = '';
-    if (!discState.albums?.length) { box.innerHTML = '<div class="empty">No albums found</div>'; return; }
+    if (!discState.albums?.length) { box.innerHTML = '<div class="empty">No releases found</div>'; return; }
     const hdr = document.createElement('span'); hdr.className = 'disc-sec';
-    hdr.textContent = `${discState.artist?.name} — Albums`;
+    hdr.textContent = discState.albumsType === 'videos'
+      ? `${discState.artist?.name} — Videos`
+      : `${discState.artist?.name} — Albums`;
     box.appendChild(hdr);
-    const grid = document.createElement('div'); grid.className = 'album-grid';
-    discState.albums.forEach(album => {
-      const card = document.createElement('div'); card.className = 'album-card';
-      const imgSrc = `https://coverartarchive.org/release-group/${album.mbid}/front-250`;
-      card.innerHTML = `<div class="alb-cover">♫<img src="${esc(imgSrc)}" loading="lazy" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()"></div><div class="alb-info"><div class="alb-title" title="${esc(album.title)}">${esc(album.title)}</div><div class="alb-year">${esc(album.year)}</div></div>`;
-      card.querySelector('.alb-cover').style.position = 'relative';
-      card.onclick = () => discSelectAlbum(album);
-      grid.appendChild(card);
-    });
-    box.appendChild(grid); return;
+
+    if (discState.albumsType === 'videos') {
+      // Piped channel fallback: render as video list
+      discState.albums.forEach(item => item.ytVideo && box.appendChild(makeResultItem(item.ytVideo)));
+    } else {
+      // MusicBrainz albums: render as cover art grid
+      const grid = document.createElement('div'); grid.className = 'album-grid';
+      discState.albums.forEach(album => {
+        const card = document.createElement('div'); card.className = 'album-card';
+        const imgSrc = `https://coverartarchive.org/release-group/${album.mbid}/front-250`;
+        card.innerHTML = `<div class="alb-cover" style="position:relative">♫<img src="${esc(imgSrc)}" loading="lazy" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()"></div><div class="alb-info"><div class="alb-title" title="${esc(album.title)}">${esc(album.title)}</div><div class="alb-year">${esc(album.year)}</div></div>`;
+        card.onclick = () => discSelectAlbum(album);
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+    }
+    return;
   }
 
   if (discState.view === 'album-yt') {
