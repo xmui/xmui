@@ -282,6 +282,27 @@
     .drag-handle { color:var(--text2);font-size:10px;cursor:grab;padding:0 2px;flex-shrink:0;align-self:center;opacity:.4;user-select:none; }
     .drag-handle:active { cursor:grabbing; }
 
+    /* ── DISCOVER PANEL ─────────────────────────────────── */
+    #disc-nav { display:none;align-items:center;gap:7px;padding:7px 9px;border-bottom:1px solid var(--border);flex-shrink:0; }
+    #disc-back { background:#fff;border:1.5px solid var(--border);color:var(--accent);cursor:pointer;font-size:14px;font-weight:700;padding:2px 9px;border-radius:8px;transition:all .14s;line-height:1.4; }
+    #disc-back:hover { background:rgba(24,180,212,0.09);border-color:var(--accent); }
+    .disc-bc { font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .disc-sec { font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text2);padding:8px 10px 2px;border-left:3px solid var(--accent);margin:4px 7px 2px;display:block; }
+    .artist-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 7px 8px; }
+    .artist-card { background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:10px 7px 8px;cursor:pointer;text-align:center;transition:all .15s; }
+    .artist-card:hover { border-color:var(--accent);background:rgba(24,180,212,0.06);transform:translateY(-1px); }
+    .a-av { width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,rgba(24,180,212,0.14),rgba(34,212,176,0.1));margin:0 auto 7px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:var(--accent);border:2px solid rgba(24,180,212,0.2);flex-shrink:0; }
+    .a-name { font-size:10px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .a-rel  { font-size:9px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .album-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 7px 8px; }
+    .album-card { background:#fff;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .15s; }
+    .album-card:hover { border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,120,180,0.12); }
+    .alb-cover { width:100%;aspect-ratio:1;background:rgba(24,180,212,0.07);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:28px;color:rgba(24,180,212,0.4); }
+    .alb-cover img { width:100%;height:100%;object-fit:cover; }
+    .alb-info { padding:6px 8px 8px; }
+    .alb-title { font-size:10px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .alb-year  { font-size:9px;color:var(--text2);margin-top:1px; }
+
     /* ── THEME PANEL ────────────────────────────────────── */
     #theme-panel {
       position:fixed;top:56px;right:0;width:260px;z-index:150;
@@ -468,7 +489,7 @@
       <div class="panel-inner" id="right-inner">
         <div id="tabs">
           <button class="tab on" onclick="switchTab('queue',this)">Queue</button>
-          <button class="tab"    onclick="switchTab('related',this)">Related</button>
+          <button class="tab"    onclick="switchTab('related',this)">Discover</button>
           <button class="tab"    onclick="switchTab('channel',this)">Channel</button>
           <button class="tab"    onclick="switchTab('history',this)">History</button>
         </div>
@@ -481,8 +502,11 @@
             <div class="empty">Queue is empty — add videos with +Q</div>
           </div>
         </div>
-        <div id="tab-related" class="tp">
-          <div id="related-list"><div class="empty">Play a video to see related</div></div>
+        <div id="tab-related" class="tp" style="padding:0;gap:0;">
+          <div id="disc-nav"></div>
+          <div id="related-list" style="flex:1;overflow-y:auto;padding:0 0 6px;">
+            <div class="empty">Play a video to discover related artists</div>
+          </div>
         </div>
         <div id="tab-channel" class="tp">
           <div id="channel-list"><div class="empty">Play a video to browse its channel</div></div>
@@ -865,6 +889,10 @@ let sessionHistory = [];
 let searchMode = 'videos';
 let restoredTime = 0;
 let infoExpanded = false;
+let discState = { view:'artists', artist:null, rels:null, albums:null, album:null, ytResults:null };
+const discArtistCache = new Map(); // lc name → {artist, rels}
+const discAlbumsCache = new Map(); // mbid → albums[]
+let discGen = 0;
 
 // ─────────────────────────────────────────────────────────
 //  SESSION PERSISTENCE
@@ -1151,7 +1179,7 @@ function saveQueuePl() {
 }
 
 // ─────────────────────────────────────────────────────────
-//  RELATED / AUTOMIX / CHANNEL
+//  DISCOVER (MusicBrainz similar artists → albums → YouTube)
 // ─────────────────────────────────────────────────────────
 
 // Strip upload-variant noise so "Song (Official Video)" and "Song [Lyrics]"
@@ -1165,42 +1193,226 @@ function coreTitle(title) {
 function titleTooSimilar(a, b) {
   const ca = coreTitle(a), cb = coreTitle(b);
   if (!ca || !cb) return false;
-  // Exact match after stripping
   if (ca === cb) return true;
-  // One is a prefix of the other (covers "Song Name - Artist" vs "Song Name")
   const shorter = ca.length < cb.length ? ca : cb;
   const longer  = ca.length < cb.length ? cb : ca;
   if (shorter.length >= 6 && longer.startsWith(shorter)) return true;
-  // Word-overlap ≥ 60% (catches re-uploads with slightly different titles)
   const wa = ca.split(' ').filter(w => w.length > 2);
   const wb = new Set(cb.split(' ').filter(w => w.length > 2));
   if (!wa.length || !wb.size) return false;
-  const overlap = wa.filter(w => wb.has(w)).length;
-  return overlap / Math.max(wa.length, wb.size) >= 0.6;
+  return wa.filter(w => wb.has(w)).length / Math.max(wa.length, wb.size) >= 0.6;
+}
+
+// MusicBrainz helper — auto-throttles to 1 req/sec
+let _lastMb = 0;
+async function mbFetch(path) {
+  const wait = 1200 - (Date.now() - _lastMb);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  _lastMb = Date.now();
+  const r = await fetch(`https://musicbrainz.org/ws/2/${path}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw Object.assign(new Error(r.status), { status: r.status });
+  return r.json();
 }
 
 async function fetchRelated(videoId) {
-  const box = document.getElementById('related-list'); box.innerHTML = '<div class="empty">Loading...</div>';
+  const gen = ++discGen;
+  const { artist: artistName } = parseTitle(current?.title || '');
+  const artistQuery = (artistName || current?.channelTitle || '')
+    .replace(/\s*(vevo|official|music|records|topic)\s*/gi, '').trim();
+
+  Object.assign(discState, { view:'artists', artist:null, rels:null, albums:null, album:null, ytResults:null });
+  renderDiscNav();
+
+  const box = document.getElementById('related-list');
+  if (!artistQuery || artistQuery.length < 2) {
+    box.innerHTML = '<div class="empty">Play a video to discover related artists</div>';
+    return;
+  }
+
+  box.innerHTML = `<div class="empty" id="disc-load">Finding artists related to <strong>${esc(artistQuery)}</strong>…</div>`;
+
   try {
-    const d = await pipedRace(`streams/${videoId}`);
-    const items = (d.relatedStreams || []).filter(r => r.url || r.videoId).slice(0, 15).map(pipedToVid).filter(v => v.id);
-    renderVidList(box, items);
-  } catch { box.innerHTML = '<div class="empty">Related unavailable</div>'; }
+    const cacheKey = artistQuery.toLowerCase();
+    if (discArtistCache.has(cacheKey)) {
+      if (discGen !== gen) return;
+      Object.assign(discState, discArtistCache.get(cacheKey));
+      renderDiscView(); return;
+    }
+
+    // 1. Find artist MBID
+    const d1 = await mbFetch(`artist?query=${encodeURIComponent(artistQuery)}&limit=3&fmt=json`);
+    if (discGen !== gen) return;
+    const mb = d1.artists?.[0];
+    if (!mb) { box.innerHTML = '<div class="empty">Artist not found in music database</div>'; return; }
+
+    const artist = { name: mb.name, mbid: mb.id };
+    discState.artist = artist;
+    const loadEl = document.getElementById('disc-load');
+    if (loadEl) loadEl.innerHTML = `Found <strong>${esc(mb.name)}</strong> — loading related artists…`;
+
+    // 2. Fetch artist rels + tags in one call
+    const d2 = await mbFetch(`artist/${mb.id}?inc=artist-rels+tags&fmt=json`);
+    if (discGen !== gen) return;
+
+    let rels = (d2.relations || [])
+      .filter(r => r['target-type'] === 'artist' && r.artist)
+      .map(r => ({ name: r.artist.name, mbid: r.artist.id, relType: r.type }))
+      .filter((a, i, arr) => arr.findIndex(x => x.mbid === a.mbid) === i)
+      .slice(0, 12);
+
+    // Pad with tag-based similar artists if too few rels
+    if (rels.length < 4) {
+      const topTag = (d2.tags || []).sort((a, b) => b.count - a.count)[0]?.name;
+      if (topTag) {
+        if (loadEl) loadEl.textContent = `Searching ${topTag} artists…`;
+        try {
+          const d3 = await mbFetch(`artist?tag=${encodeURIComponent(topTag)}&limit=14&fmt=json`);
+          if (discGen !== gen) return;
+          const seen = new Set(rels.map(r => r.mbid));
+          seen.add(mb.id);
+          for (const a of (d3.artists || [])) {
+            if (!seen.has(a.id)) { rels.push({ name: a.name, mbid: a.id, relType: topTag }); seen.add(a.id); }
+            if (rels.length >= 10) break;
+          }
+        } catch {}
+      }
+    }
+
+    discState.rels = rels;
+    discArtistCache.set(cacheKey, { artist, rels });
+    if (discGen !== gen) return;
+    renderDiscView();
+
+  } catch(e) {
+    if (discGen !== gen || e.name === 'AbortError') return;
+    const msg = e.status === 429 ? 'Rate limited — try again in a moment' : 'Music database unavailable';
+    box.innerHTML = `<div class="empty">${msg}</div>`;
+  }
 }
+
+async function discSelectArtist(artist) {
+  discState.view = 'albums';
+  discState.artist = artist;
+  discState.albums = null; discState.album = null; discState.ytResults = null;
+  renderDiscNav();
+
+  if (discAlbumsCache.has(artist.mbid)) {
+    discState.albums = discAlbumsCache.get(artist.mbid);
+    renderDiscView(); return;
+  }
+
+  const box = document.getElementById('related-list');
+  box.innerHTML = `<div class="empty">Loading albums by <strong>${esc(artist.name)}</strong>…</div>`;
+
+  try {
+    const d = await mbFetch(`release-group?artist=${artist.mbid}&type=album&fmt=json&limit=25`);
+    const albums = (d['release-groups'] || [])
+      .map(rg => ({ mbid: rg.id, title: rg.title, year: rg['first-release-date']?.slice(0, 4) || '' }))
+      .sort((a, b) => (b.year || '0').localeCompare(a.year || '0'));
+    discState.albums = albums;
+    discAlbumsCache.set(artist.mbid, albums);
+    renderDiscView();
+  } catch(e) {
+    if (e.name !== 'AbortError') document.getElementById('related-list').innerHTML = '<div class="empty">Albums unavailable</div>';
+  }
+}
+
+async function discSelectAlbum(album) {
+  discState.view = 'album-yt';
+  discState.album = album; discState.ytResults = null;
+  renderDiscNav();
+
+  const box = document.getElementById('related-list');
+  box.innerHTML = `<div class="empty">Searching YouTube for<br><strong>${esc(discState.artist?.name)} — ${esc(album.title)}</strong>…</div>`;
+
+  try {
+    const q = `${discState.artist?.name || ''} ${album.title} full album`;
+    const d = await pipedRace('search', { q, filter: 'videos' });
+    discState.ytResults = (d.items || []).filter(x => x.url || x.videoId).slice(0, 8).map(pipedToVid).filter(v => v.id);
+    renderDiscView();
+  } catch { document.getElementById('related-list').innerHTML = '<div class="empty">YouTube search unavailable</div>'; }
+}
+
+function discGoBack() {
+  if (discState.view === 'album-yt') { discState.view = 'albums'; discState.ytResults = null; }
+  else if (discState.view === 'albums') { discState.view = 'artists'; discState.albums = null; }
+  renderDiscNav(); renderDiscView();
+}
+
+function renderDiscNav() {
+  const nav = document.getElementById('disc-nav');
+  if (discState.view === 'artists') { nav.style.display = 'none'; return; }
+  nav.style.display = 'flex';
+  const label = discState.view === 'albums'
+    ? (discState.artist?.name || '')
+    : `${discState.artist?.name || ''} — ${discState.album?.title || ''}`;
+  nav.innerHTML = `<button id="disc-back" onclick="discGoBack()">&#8592;</button><span class="disc-bc">${esc(label)}</span>`;
+}
+
+function renderDiscView() {
+  const box = document.getElementById('related-list');
+
+  if (discState.view === 'artists') {
+    box.innerHTML = '';
+    if (!discState.rels?.length) { box.innerHTML = '<div class="empty">No related artists found</div>'; return; }
+    const hdr = document.createElement('span'); hdr.className = 'disc-sec';
+    hdr.textContent = `Related to ${discState.artist?.name || ''}`;
+    box.appendChild(hdr);
+    const grid = document.createElement('div'); grid.className = 'artist-grid';
+    discState.rels.forEach(a => {
+      const card = document.createElement('div'); card.className = 'artist-card';
+      card.innerHTML = `<div class="a-av">${esc(a.name[0].toUpperCase())}</div><div class="a-name" title="${esc(a.name)}">${esc(a.name)}</div><div class="a-rel">${esc(a.relType || '')}</div>`;
+      card.onclick = () => discSelectArtist(a);
+      grid.appendChild(card);
+    });
+    box.appendChild(grid); return;
+  }
+
+  if (discState.view === 'albums') {
+    box.innerHTML = '';
+    if (!discState.albums?.length) { box.innerHTML = '<div class="empty">No albums found</div>'; return; }
+    const hdr = document.createElement('span'); hdr.className = 'disc-sec';
+    hdr.textContent = `${discState.artist?.name} — Albums`;
+    box.appendChild(hdr);
+    const grid = document.createElement('div'); grid.className = 'album-grid';
+    discState.albums.forEach(album => {
+      const card = document.createElement('div'); card.className = 'album-card';
+      const imgSrc = `https://coverartarchive.org/release-group/${album.mbid}/front-250`;
+      card.innerHTML = `<div class="alb-cover">♫<img src="${esc(imgSrc)}" loading="lazy" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()"></div><div class="alb-info"><div class="alb-title" title="${esc(album.title)}">${esc(album.title)}</div><div class="alb-year">${esc(album.year)}</div></div>`;
+      card.querySelector('.alb-cover').style.position = 'relative';
+      card.onclick = () => discSelectAlbum(album);
+      grid.appendChild(card);
+    });
+    box.appendChild(grid); return;
+  }
+
+  if (discState.view === 'album-yt') {
+    box.innerHTML = '';
+    if (!discState.ytResults?.length) { box.innerHTML = '<div class="empty">No YouTube results found</div>'; return; }
+    const hdr = document.createElement('span'); hdr.className = 'disc-sec';
+    hdr.textContent = `${discState.album?.title} on YouTube`;
+    box.appendChild(hdr);
+    discState.ytResults.forEach(v => box.appendChild(makeResultItem(v)));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  AUTOMIX / CHANNEL
+// ─────────────────────────────────────────────────────────
 async function fetchAutomix(videoId) {
   try {
-    // Build a set of recently-heard titles to avoid re-uploading duplicates
     const recentTitles = sessionHistory.slice(0, 20).map(v => v.title);
     function isStale(v) {
       if (!v?.id || v.id === videoId) return true;
       return recentTitles.some(t => titleTooSimilar(t, v.title));
     }
-
     let pick;
     if (useGoogle && accessToken) {
       const d = await ytApi('search',{part:'snippet',q:(current?.title||'').split(' ').slice(0,5).join(' '),type:'video',videoCategoryId:'10',maxResults:12});
-      const items=(d.items||[]).map(snToVid).filter(v=>!isStale(v));
-      if (!items.length) return;
+      const items=(d.items||[]).map(snToVid).filter(v=>!isStale(v)); if (!items.length) return;
       pick = items[Math.floor(Math.random() * items.length)];
     } else {
       const d = await pipedRace(`streams/${videoId}`);
