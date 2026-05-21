@@ -580,9 +580,9 @@
     }
     #buddy-controls {
       position:absolute; top:2px; right:0; display:flex; gap:4px;
-      opacity:0; pointer-events:none; transition:opacity .2s; z-index:2;
+      opacity:0.28; pointer-events:all; transition:opacity .2s; z-index:2;
     }
-    #aqua-buddy:hover #buddy-controls { opacity:1; pointer-events:all; }
+    #aqua-buddy:hover #buddy-controls { opacity:1; }
     .buddy-ctrl-btn {
       width:22px; height:22px; border-radius:50%; padding:0; line-height:1;
       background:rgba(255,255,255,0.95); border:1.5px solid rgba(0,140,200,0.38);
@@ -1348,25 +1348,49 @@ async function resolveSoundCloudUrl(scUrl) {
   return { id: scUrl, title: d.title, channelTitle: d.author_name || '', channelId: '', thumbnail: d.thumbnail_url || '', source: 'soundcloud', scUrl };
 }
 
-// Known public client_ids — tried in order until one works
-const SC_CLIENT_IDS = [
-  'iZIs9mchVcX5lhVRyQGGAYlNPVldzAoX',
-  '2t9loNQH90kzJcsFCODdigxfp325aq4z',
-  'a3e059563d7fd3372b49b37f00a00d4a',
-];
-let scClientIdx = 0;
+let scDynClientId = null;
+async function getScClientId() {
+  if (scDynClientId) return scDynClientId;
+  // Try to extract client_id from the oEmbed HTML field — the iframe src often includes it
+  try {
+    const oe = await fetch(
+      'https://soundcloud.com/oembed?url=https%3A%2F%2Fsoundcloud.com%2Fforss%2Fflickermood&format=json',
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (oe.ok) {
+      const d = await oe.json();
+      const m = (d.html || '').match(/client_id=([a-zA-Z0-9_-]{20,})/);
+      if (m) { scDynClientId = m[1]; return scDynClientId; }
+    }
+  } catch {}
+  // Try fetching the widget player page source (may have CORS)
+  try {
+    const wp = await fetch(
+      'https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fforss%2Fflickermood',
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (wp.ok) {
+      const text = await wp.text();
+      const m = text.match(/client_id[=:"']+([a-zA-Z0-9_-]{20,})/);
+      if (m) { scDynClientId = m[1]; return scDynClientId; }
+    }
+  } catch {}
+  return null;
+}
 async function searchSoundCloud(q) {
-  for (let attempt = 0; attempt < SC_CLIENT_IDS.length; attempt++) {
-    const cid = SC_CLIENT_IDS[(scClientIdx + attempt) % SC_CLIENT_IDS.length];
+  // Collect candidates: dynamic first, then fallbacks
+  const dynId = await getScClientId();
+  const ids = [...new Set([dynId, 'iZIs9mchVcX5lhVRyQGGAYlNPVldzAoX', '2t9loNQH90kzJcsFCODdigxfp325aq4z', 'a3e059563d7fd3372b49b37f00a00d4a'].filter(Boolean))];
+  for (const cid of ids) {
     try {
       const r = await fetch(
         `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&client_id=${cid}&limit=20&offset=0`,
         { signal: AbortSignal.timeout(8000) }
       );
-      if (r.status === 401 || r.status === 403) continue;
+      if (r.status === 401 || r.status === 403) { if (cid === dynId) scDynClientId = null; continue; }
       if (!r.ok) throw new Error(r.status);
       const d = await r.json();
-      scClientIdx = (scClientIdx + attempt) % SC_CLIENT_IDS.length;
+      scDynClientId = cid;
       return (d.collection || []).map(t => ({
         id: t.permalink_url, title: t.title,
         channelTitle: t.user?.username || '', channelId: '',
@@ -1395,20 +1419,6 @@ async function playSoundCloud(v) {
   const vol = +document.getElementById('vol').value;
 
   if (scReady && scWidget) {
-    // Rebind PLAY so getCurrentSound picks up the new track's metadata
-    scWidget.unbind(SC.Widget.Events.PLAY);
-    scWidget.bind(SC.Widget.Events.PLAY, () => {
-      playing = true; document.getElementById('play-btn').textContent = 'Pause'; startProg();
-      scWidget.getCurrentSound(sound => {
-        if (!sound) return;
-        const title   = sound.title || '';
-        const author  = sound.user?.username || '';
-        const artwork = (sound.artwork_url || sound.user?.avatar_url || '').replace(/-large\b/, '-t300x300');
-        if (title)   { document.getElementById('np-title').textContent = title;  if (current) current.title = title; }
-        if (author)  { document.getElementById('np-ch').textContent = author;    if (current) current.channelTitle = author; }
-        if (artwork) { const th = document.getElementById('np-thumb'); th.src = artwork; th.style.display = 'block'; if (current) current.thumbnail = artwork; }
-      });
-    });
     scWidget.load(v.scUrl, { auto_play: true, hide_related: true, show_comments: false, show_user: false });
     scWidget.setVolume(vol);
     return;
