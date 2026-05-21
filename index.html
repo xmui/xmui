@@ -1395,6 +1395,20 @@ async function playSoundCloud(v) {
   const vol = +document.getElementById('vol').value;
 
   if (scReady && scWidget) {
+    // Rebind PLAY so getCurrentSound picks up the new track's metadata
+    scWidget.unbind(SC.Widget.Events.PLAY);
+    scWidget.bind(SC.Widget.Events.PLAY, () => {
+      playing = true; document.getElementById('play-btn').textContent = 'Pause'; startProg();
+      scWidget.getCurrentSound(sound => {
+        if (!sound) return;
+        const title   = sound.title || '';
+        const author  = sound.user?.username || '';
+        const artwork = (sound.artwork_url || sound.user?.avatar_url || '').replace(/-large\b/, '-t300x300');
+        if (title)   { document.getElementById('np-title').textContent = title;  if (current) current.title = title; }
+        if (author)  { document.getElementById('np-ch').textContent = author;    if (current) current.channelTitle = author; }
+        if (artwork) { const th = document.getElementById('np-thumb'); th.src = artwork; th.style.display = 'block'; if (current) current.thumbnail = artwork; }
+      });
+    });
     scWidget.load(v.scUrl, { auto_play: true, hide_related: true, show_comments: false, show_user: false });
     scWidget.setVolume(vol);
     return;
@@ -1408,7 +1422,19 @@ async function playSoundCloud(v) {
   }
   scWidget = SC.Widget(frame);
   scWidget.bind(SC.Widget.Events.READY, () => { scReady = true; scWidget.setVolume(vol); });
-  scWidget.bind(SC.Widget.Events.PLAY,   () => { playing = true;  document.getElementById('play-btn').textContent = 'Pause'; startProg(); });
+  scWidget.bind(SC.Widget.Events.PLAY, () => {
+    playing = true; document.getElementById('play-btn').textContent = 'Pause'; startProg();
+    // Pull real metadata from the widget — works without any API key
+    scWidget.getCurrentSound(sound => {
+      if (!sound) return;
+      const title   = sound.title || '';
+      const author  = sound.user?.username || '';
+      const artwork = (sound.artwork_url || sound.user?.avatar_url || '').replace(/-large\b/, '-t300x300');
+      if (title)   { document.getElementById('np-title').textContent = title;  if (current) current.title = title; }
+      if (author)  { document.getElementById('np-ch').textContent = author;    if (current) current.channelTitle = author; }
+      if (artwork) { const th = document.getElementById('np-thumb'); th.src = artwork; th.style.display = 'block'; if (current) current.thumbnail = artwork; }
+    });
+  });
   scWidget.bind(SC.Widget.Events.PAUSE,  () => { playing = false; document.getElementById('play-btn').textContent = 'Play'; });
   scWidget.bind(SC.Widget.Events.FINISH, () => { playing = false; document.getElementById('play-btn').textContent = 'Play'; onEnded(); });
 }
@@ -1485,11 +1511,16 @@ async function doSearch() {
   if (curSearchMode === 'sc') {
     const scUrl = extractSoundCloudUrl(raw);
     if (scUrl) {
-      box.innerHTML = '<div class="empty">Loading SoundCloud track…</div>';
-      try {
-        const v = await resolveSoundCloudUrl(scUrl);
-        box.innerHTML = ''; box.appendChild(makeResultItem(v));
-      } catch { box.innerHTML = '<div class="empty">Could not load this SoundCloud URL</div>'; }
+      // Build a basic playable item immediately — no oEmbed needed
+      const slug = scUrl.replace(/^https?:\/\/soundcloud\.com\//, '').split('?')[0];
+      const [scArtist, scTrack] = slug.split('/');
+      const v = {
+        id: scUrl,
+        title: scTrack ? scTrack.replace(/-/g, ' ') : slug.replace(/-/g, ' '),
+        channelTitle: scArtist ? scArtist.replace(/-/g, ' ') : '',
+        source: 'soundcloud', scUrl, thumbnail: ''
+      };
+      box.innerHTML = ''; box.appendChild(makeResultItem(v));
       return;
     }
     box.innerHTML = '<div class="empty">Searching SoundCloud…</div>';
@@ -1499,21 +1530,25 @@ async function doSearch() {
       box.innerHTML = '';
       tracks.forEach(v => box.appendChild(makeResultItem(v)));
     } catch (e) {
-      box.innerHTML = e.message === 'auth'
-        ? '<div class="empty">SoundCloud search unavailable — paste a soundcloud.com URL directly</div>'
-        : '<div class="empty">SoundCloud search failed — try pasting the URL directly</div>';
+      box.innerHTML = `<div class="empty" style="text-align:center">SoundCloud search unavailable.<br><br>
+<a href="https://soundcloud.com/search?q=${encodeURIComponent(raw)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Search on SoundCloud.com ↗</a><br><br>
+<span style="opacity:.65;font-size:10px">Or paste a soundcloud.com track URL above</span></div>`;
     }
     return;
   }
 
-  // SoundCloud URL pasted in non-SC mode — handle it anyway
+  // SoundCloud URL pasted in non-SC mode — build playable item immediately
   const scUrl = extractSoundCloudUrl(raw);
   if (scUrl) {
-    box.innerHTML = '<div class="empty">Loading SoundCloud track…</div>';
-    try {
-      const v = await resolveSoundCloudUrl(scUrl);
-      box.innerHTML = ''; box.appendChild(makeResultItem(v));
-    } catch { box.innerHTML = '<div class="empty">Could not load this SoundCloud URL</div>'; }
+    const slug = scUrl.replace(/^https?:\/\/soundcloud\.com\//, '').split('?')[0];
+    const [scArtist, scTrack] = slug.split('/');
+    const v = {
+      id: scUrl,
+      title: scTrack ? scTrack.replace(/-/g, ' ') : slug.replace(/-/g, ' '),
+      channelTitle: scArtist ? scArtist.replace(/-/g, ' ') : '',
+      source: 'soundcloud', scUrl, thumbnail: ''
+    };
+    box.innerHTML = ''; box.appendChild(makeResultItem(v));
     return;
   }
 
