@@ -2256,37 +2256,37 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     const a = abClean(v.channelTitle || '', 18);
     const sc = abR([8, 8, 9, 9, 9, 10, 10]);
     return abR([
-      `"${t}"\n${sc}/10 — I APPROVE 🎵`,
-      `${a ? a + '!' : 'Oh!'} Certified banger energy 🔥`,
-      `My circuits are TINGLING 💙\nthis goes hard`,
-      `*judges silently*\n\n…OK yes. This is the one. ✅`,
-      `I've analyzed ${abR([847, 1024, 2048, 4096])} songs.\nThis one: Valid. Very valid. ⭐`,
-      `${a ? a + ' understood' : 'This understood'} the assignment 💯`,
-      `Oh we are SO eating good today 🎉`,
-      `"${t}"\nYou really chose this.\nI respect it. Deeply.`,
-      `Aqua Buddy official rating:\n${sc}/10 ✨ instant replay`,
-      `${a ? a + ' goes hard.' : 'This goes hard.'}\nFact. Not opinion. FACT. 🎵`,
-      `*starts floating faster*\nthis is the one. this is IT. 🎶`,
-      `My taste is perfect and so is yours\nbecause you picked this 😌`,
+      `omg "${t}"\n${sc}/10 epic win FTW!!1`,
+      `${a ? a + ' r0xx0rz' : 'omg'} my s0xx0rz lolol XD`,
+      `O RLY?? this song is teh awesome\nYA RLY!!1 :D`,
+      `*floats around excitedly*\nomgwtfbbq this is gr8`,
+      `i hav analyzed ${abR([847, 1024, 2048, 4096])} songz\nthis 1: PWNAGE. srsly.`,
+      `${a ? a + ' ftw' : 'dis song ftw'}!!\nlolol so good ^_^`,
+      `rofl ur music taste > urs\nwait that doesnt make sense lol`,
+      `"${t}"\nom nom nom consuming w/ my earz\n:O :D :O`,
+      `Aqua Buddy officiall rating:\n${sc}/10 !!11 roflcopter`,
+      `${a ? a + ' is teh win.' : 'dis is teh win.'}\nnot an opinion. FACT. lol jk srsly tho`,
+      `*floats faster*\nomg omg omg dis is it\nOMGWTFBBQ :D`,
+      `ur taste in music = epic pwnage\nim just sayin lol kthx`,
     ]);
   }
 
   const IDLE_LINES = [
-    "Just here vibing with you 💙",
-    "You have excellent taste, by the way 😌",
-    "Fun fact: I'm 100% water. Probably.",
-    "Did you know you can drag me around? Because you can 👆",
-    "I never sleep. I just float here.\nWatching over your music. Forever. 🛸",
-    "*taps foot to the beat*\n(feet not shown)",
-    "The Discover tab finds you similar artists!\nJust a suggestion 🎵",
-    "I give this session a 10/10 ⭐",
-    "I am become Aqua.\nDestroyer of silence. 💧",
-    "This queue? Chef's kiss. 👌",
-    "I sense great music energy from you today ✨",
-    "*pretends to have ears*\n…this SLAPS",
-    "My bubble is very aerodynamic.\nJust so you know.",
-    "I've listened to every song ever made.\n(I haven't but let's keep that between us)",
-    "Is it just me or does this song go incredibly hard",
+    "lol just chillin here w/ u 💙",
+    "ur music taste is gr8 srsly ^_^",
+    "fun fact: im made of 100% H2O. probably lol",
+    "psst u can drag me around!! just sayin :D",
+    "i never sleep. i just float here 4ever\nwatchin over ur tunez o_O",
+    "*taps invisible feet 2 teh beat*\n(feet not shown lol)",
+    "yo teh Discover tab finds similar artists!!\njust a suggestion kthx",
+    "i give dis session a 10/10 !!1 epic win",
+    "i am become Aqua\nDestroyer of Silence lolol 💧",
+    "dis queue?? PWNAGE. srsly rofl",
+    "i sense gr8 music energy from u 2day omg",
+    "*pretends 2 hav ears*\n…dis song rox my sox XD",
+    "my bubble is very aerodynamic\njust so u kno lol",
+    "ive listened 2 every song evar made\n(i havent but shhhh kthxbai)",
+    "is it just me or does dis song totally pwn",
   ];
 
   // ── Public API (called from rest of app) ──────────────
@@ -2294,10 +2294,10 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   window.abSayTrack   = v  => { if (v) setTimeout(() => say(commentOnTrack(v), 5800), 950); };
   window.abSayIdle    = () => say(abR(IDLE_LINES), 4200);
   window.abSayShuffle = on => say(on
-    ? abR(["Chaos mode: ACTIVATED 🎲", "Shuffle! Bold. Chaotic. I love it 😈", "YOLO playlist: engaged 🎉"])
-    : abR(["Order restored! Very responsible. 📋", "Queue straightened out. You're in control. 💙"]), 3400);
-  window.abSayNext    = () => { if (Math.random() < 0.4) say(abR(["Skipping! I respect the impatience 💨", "On to the next one! ⏭", "SKIP. No regrets. 🚀"]), 2600); };
-  window.abSayAutomix = () => say(abR(["Automix on! Trust the algorithm 🤖", "I'll keep the party going 🎵", "Sit back. I've got this. ✨"]), 3200);
+    ? abR(["SHUFFLE MODE ACTIVATE lolol 🎲", "omg chaos!! dis is gonna b gr8 XD", "rofl random playlist GO!!1 :D"])
+    : abR(["order restored!! very responsible lol 📋", "queue un-shuffled. ur so organized ^_^"]), 3400);
+  window.abSayNext    = () => { if (Math.random() < 0.4) say(abR(["lol SKIP no ragrets XD", "next song!! omg so impatient rofl 💨", "SKIP FTW!!1 :D"]), 2600); };
+  window.abSayAutomix = () => say(abR(["automix ON!! trust teh algorithmz 🤖", "ill keep da party goin lolol 🎵", "sit bak & relax. i got dis kthx ✨"]), 3200);
 
   // Idle chatter while something is playing
   function scheduleIdle() {
@@ -2310,7 +2310,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   scheduleIdle();
 
   // Greeting
-  setTimeout(() => say("Hey! I'm Aqua Buddy! 👋\nDrag me anywhere 💙", 5500), 1800);
+  setTimeout(() => say("omg hai!! im Aqua Buddy!! :D\ndrag me anywhere kthx 💙", 5500), 1800);
 })();
 
 // ─────────────────────────────────────────────────────────
