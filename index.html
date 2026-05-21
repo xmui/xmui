@@ -536,6 +536,7 @@
     /* ── AQUA BUDDY ─────────────────────────────────────── */
     #aqua-buddy {
       position:fixed; bottom:90px; right:24px; z-index:500; width:80px;
+      padding-top:34px; /* extends hover zone upward so controls are reachable */
       cursor:grab; user-select:none; touch-action:none;
       filter: drop-shadow(0 6px 16px rgba(0,80,160,0.42)) drop-shadow(0 2px 6px rgba(0,110,190,0.25));
       animation: abFloat 3.5s ease-in-out infinite;
@@ -578,7 +579,7 @@
       border:7px solid transparent; border-top-color:rgba(218,248,255,0.97);
     }
     #buddy-controls {
-      position:absolute; top:-30px; right:-2px; display:flex; gap:4px;
+      position:absolute; top:2px; right:0; display:flex; gap:4px;
       opacity:0; pointer-events:none; transition:opacity .2s; z-index:2;
     }
     #aqua-buddy:hover #buddy-controls { opacity:1; pointer-events:all; }
@@ -1346,8 +1347,40 @@ async function resolveSoundCloudUrl(scUrl) {
   if (!d.title) throw new Error('no data');
   return { id: scUrl, title: d.title, channelTitle: d.author_name || '', channelId: '', thumbnail: d.thumbnail_url || '', source: 'soundcloud', scUrl };
 }
+
+// Known public client_ids — tried in order until one works
+const SC_CLIENT_IDS = [
+  'iZIs9mchVcX5lhVRyQGGAYlNPVldzAoX',
+  '2t9loNQH90kzJcsFCODdigxfp325aq4z',
+  'a3e059563d7fd3372b49b37f00a00d4a',
+];
+let scClientIdx = 0;
+async function searchSoundCloud(q) {
+  for (let attempt = 0; attempt < SC_CLIENT_IDS.length; attempt++) {
+    const cid = SC_CLIENT_IDS[(scClientIdx + attempt) % SC_CLIENT_IDS.length];
+    try {
+      const r = await fetch(
+        `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&client_id=${cid}&limit=20&offset=0`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (r.status === 401 || r.status === 403) continue;
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      scClientIdx = (scClientIdx + attempt) % SC_CLIENT_IDS.length;
+      return (d.collection || []).map(t => ({
+        id: t.permalink_url, title: t.title,
+        channelTitle: t.user?.username || '', channelId: '',
+        thumbnail: (t.artwork_url || t.user?.avatar_url || '').replace(/-large\./, '-t300x300.'),
+        source: 'soundcloud', scUrl: t.permalink_url,
+      }));
+    } catch (e) { if (e.name === 'AbortError') throw e; }
+  }
+  throw new Error('auth');
+}
 async function playSoundCloud(v) {
   current = v; currentSource = 'soundcloud';
+  // Pause YouTube if it was playing
+  if (player && ready) { try { player.pauseVideo(); } catch {} }
   document.getElementById('ph').style.display = 'none';
   document.getElementById('yt-player').style.display = 'none';
   document.getElementById('sc-player').style.display = 'block';
@@ -1385,8 +1418,9 @@ async function playSoundCloud(v) {
 // ─────────────────────────────────────────────────────────
 function playVideo(v) {
   if (v.source === 'soundcloud') { playSoundCloud(v); return; }
-  // Switch back to YT player if coming from SC
+  // Switch back to YT player if coming from SC — pause SC first
   if (currentSource === 'soundcloud') {
+    if (scWidget && scReady) { try { scWidget.pause(); } catch {} }
     document.getElementById('sc-player').style.display = 'none';
     document.getElementById('yt-player').style.display = 'block';
     currentSource = 'youtube';
@@ -1434,7 +1468,7 @@ let curSearchMode = 'videos';
 const SEARCH_HINTS = {
   videos:    'Paste a YouTube link, <strong>video ID</strong>, or <strong>playlist URL</strong>',
   playlists: 'Search for YouTube playlists, or paste a playlist URL',
-  sc:        'Paste a <strong>SoundCloud URL</strong> (soundcloud.com/artist/track)',
+  sc:        'Search SoundCloud tracks, or paste a soundcloud.com URL',
 };
 function setSearchMode(mode, btn) {
   curSearchMode = mode;
@@ -1447,7 +1481,32 @@ async function doSearch() {
   const raw = document.getElementById('q').value.trim(); if (!raw) return;
   const box = document.getElementById('results');
 
-  // SoundCloud URL (any mode)
+  // SoundCloud mode — search or URL
+  if (curSearchMode === 'sc') {
+    const scUrl = extractSoundCloudUrl(raw);
+    if (scUrl) {
+      box.innerHTML = '<div class="empty">Loading SoundCloud track…</div>';
+      try {
+        const v = await resolveSoundCloudUrl(scUrl);
+        box.innerHTML = ''; box.appendChild(makeResultItem(v));
+      } catch { box.innerHTML = '<div class="empty">Could not load this SoundCloud URL</div>'; }
+      return;
+    }
+    box.innerHTML = '<div class="empty">Searching SoundCloud…</div>';
+    try {
+      const tracks = await searchSoundCloud(raw);
+      if (!tracks.length) { box.innerHTML = '<div class="empty">No results — try different keywords or paste a URL</div>'; return; }
+      box.innerHTML = '';
+      tracks.forEach(v => box.appendChild(makeResultItem(v)));
+    } catch (e) {
+      box.innerHTML = e.message === 'auth'
+        ? '<div class="empty">SoundCloud search unavailable — paste a soundcloud.com URL directly</div>'
+        : '<div class="empty">SoundCloud search failed — try pasting the URL directly</div>';
+    }
+    return;
+  }
+
+  // SoundCloud URL pasted in non-SC mode — handle it anyway
   const scUrl = extractSoundCloudUrl(raw);
   if (scUrl) {
     box.innerHTML = '<div class="empty">Loading SoundCloud track…</div>';
@@ -1455,10 +1514,6 @@ async function doSearch() {
       const v = await resolveSoundCloudUrl(scUrl);
       box.innerHTML = ''; box.appendChild(makeResultItem(v));
     } catch { box.innerHTML = '<div class="empty">Could not load this SoundCloud URL</div>'; }
-    return;
-  }
-  if (curSearchMode === 'sc') {
-    box.innerHTML = '<div class="empty">Paste a SoundCloud URL above to load a track</div>';
     return;
   }
 
