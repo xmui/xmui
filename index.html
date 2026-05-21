@@ -751,12 +751,21 @@ function loadSavedTheme() {
 // ─────────────────────────────────────────────────────────
 //  LAST.FM
 // ─────────────────────────────────────────────────────────
-let lastFmKey = localStorage.getItem('yt_lastfm_key') || '';
-function saveLastfmKey() {
-  const v = document.getElementById('lastfm-key-inp').value.trim();
-  if (!v) return;
-  lastFmKey = v; localStorage.setItem('yt_lastfm_key', v);
-  toast('Last.fm key saved');
+const LASTFM_KEY = 'd9a034fc33d1f1407b2460c40e635265';
+async function lfmFetch(method, params = {}) {
+  const p = new URLSearchParams({ method, api_key: LASTFM_KEY, format: 'json', ...params });
+  const r = await fetch(`https://ws.audioscrobbler.com/2.0/?${p}`, { signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+function lfmImg(images, size = 'large') {
+  const order = ['extralarge', 'large', 'medium', 'small', ''];
+  const prefer = [size, ...order.filter(s => s !== size)];
+  for (const s of prefer) {
+    const found = images?.find(i => i.size === s);
+    if (found?.['#text']) return found['#text'];
+  }
+  return '';
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1322,70 +1331,69 @@ function titleTooSimilar(a, b) {
   return wa.filter(w => wb.has(w)).length / Math.max(wa.length, wb.size) >= 0.6;
 }
 
-// MusicBrainz helper — auto-throttles to 1 req/sec
-let _lastMb = 0;
-async function mbFetch(path) {
-  const wait = 1200 - (Date.now() - _lastMb);
-  if (wait > 0) await new Promise(r => setTimeout(r, wait));
-  _lastMb = Date.now();
-  const r = await fetch(`https://musicbrainz.org/ws/2/${path}`, {
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!r.ok) throw Object.assign(new Error(r.status), { status: r.status });
-  return r.json();
-}
-
 async function fetchRelated(videoId) {
   const gen = ++discGen;
-  const currentCh = (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim().toLowerCase();
+  const artistName = (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim();
+  const parsedArtist = parseTitle(current?.title || '').artist;
+  const query = artistName || parsedArtist || '';
 
   Object.assign(discState, { view:'artists', artist:null, rels:null, albums:null, albumsType:'albums', album:null, ytResults:null });
   renderDiscNav();
-
   const box = document.getElementById('related-list');
   box.innerHTML = '<div class="empty">Finding related artists…</div>';
 
+  // Last.fm artist.getSimilar — fast, accurate, music-only
+  if (query) {
+    try {
+      const d = await lfmFetch('artist.getSimilar', { artist: query, limit: 12, autocorrect: 1 });
+      if (discGen !== gen) return;
+      const lfmError = d.error;
+      const artists = lfmError ? [] : (d.similarartists?.artist || []).map(a => ({
+        name: a.name,
+        match: Math.round(+a.match * 100),
+        img: lfmImg(a.image, 'large'),
+        channelId: '',
+      }));
+      if (artists.length) {
+        discState.artist = { name: query };
+        discState.rels = artists;
+        renderDiscView();
+        return;
+      }
+    } catch(e) {
+      if (discGen !== gen || e.name === 'AbortError') return;
+    }
+  }
+
+  // Fallback: Piped relatedStreams (YouTube recommendation graph)
   try {
-    // Pull Piped related streams — YouTube's own similarity graph, always populated
     const d = await pipedRace(`streams/${videoId}`);
     if (discGen !== gen) return;
-
     const streams = (d.relatedStreams || []).filter(r => (r.url || r.videoId) && r.uploaderName);
-
-    // Only count a channel as "musical" if at least one of its videos looks like music content
     function isMusicStream(r) {
       const title = (r.title || '').toLowerCase();
       const uploader = (r.uploaderName || '').toLowerCase();
       return uploader.includes('vevo') || uploader.endsWith('- topic') ||
         /\b(official\s*(video|audio|mv|lyric)|lyric\s*video|music\s*video|\bmv\b|feat\.|ft\.)\b/.test(title);
     }
-
-    // Deduplicate by channel; frequency = relevance signal; require music evidence
     const seen = new Map();
     streams.forEach(r => {
       const chId = r.uploaderUrl?.match(/\/channel\/([^/]+)/)?.[1] || '';
       const name = decodeHtml(r.uploaderName || '').replace(/\s*-\s*topic$/i, '').trim();
-      if (!name || name.toLowerCase() === currentCh) return;
+      if (!name || name.toLowerCase() === query.toLowerCase()) return;
       const key = chId || name.toLowerCase();
       const entry = seen.get(key);
       if (entry) { entry.count++; if (isMusicStream(r)) entry.musicCount++; }
-      else seen.set(key, { name, channelId: chId, count: 1, musicCount: isMusicStream(r) ? 1 : 0 });
+      else seen.set(key, { name, channelId: chId, count: 1, musicCount: isMusicStream(r) ? 1 : 0, match: null, img: '' });
     });
-
-    // Require at least one music-looking video, or 3+ total appearances (strong signal)
-
     const artists = [...seen.values()]
       .filter(a => a.musicCount > 0 || a.count >= 3)
       .sort((a, b) => b.count - a.count).slice(0, 12);
-
     if (!artists.length) { box.innerHTML = '<div class="empty">No related artists found</div>'; return; }
-
-    discState.artist = { name: (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim() };
+    discState.artist = { name: query || artistName };
     discState.rels = artists;
     if (discGen !== gen) return;
     renderDiscView();
-
   } catch(e) {
     if (discGen !== gen || e.name === 'AbortError') return;
     box.innerHTML = '<div class="empty">Discovery unavailable</div>';
@@ -1405,32 +1413,29 @@ async function discSelectArtist(artist) {
   }
 
   const box = document.getElementById('related-list');
-  box.innerHTML = `<div class="empty">Loading releases for <strong>${esc(artist.name)}</strong>…</div>`;
+  box.innerHTML = `<div class="empty">Loading albums for <strong>${esc(artist.name)}</strong>…</div>`;
 
+  // Last.fm artist.getTopAlbums — instant, includes cover art
   try {
-    // MusicBrainz: find MBID then grab albums (2 throttled calls)
-    const d1 = await mbFetch(`artist?query=${encodeURIComponent(artist.name)}&limit=3&fmt=json`);
-    const mb = d1.artists?.[0];
-
-    if (mb) {
-      const d2 = await mbFetch(`release-group?artist=${mb.id}&type=album&fmt=json&limit=25`);
-      const albums = (d2['release-groups'] || [])
-        .map(rg => ({ mbid: rg.id, title: rg.title, year: rg['first-release-date']?.slice(0, 4) || '' }))
-        .sort((a, b) => (b.year || '0').localeCompare(a.year || '0'));
-
-      if (albums.length) {
-        discState.artist = { ...artist, mbid: mb.id, name: mb.name };
-        discState.albums = albums; discState.albumsType = 'albums';
-        discAlbumsCache.set(cacheKey, { albums, albumsType: 'albums', artist: discState.artist });
-        renderDiscView(); return;
-      }
+    const d = await lfmFetch('artist.getTopAlbums', { artist: artist.name, limit: 20, autocorrect: 1 });
+    const albums = (d.topalbums?.album || [])
+      .filter(a => a.name && a.name !== '(null)')
+      .map(a => ({
+        title: a.name,
+        year: '',
+        img: lfmImg(a.image, 'extralarge') || lfmImg(a.image, 'large'),
+        mbid: a.mbid || '',
+      }));
+    if (albums.length) {
+      discState.albums = albums; discState.albumsType = 'albums';
+      discAlbumsCache.set(cacheKey, { albums, albumsType: 'albums', artist });
+      renderDiscView(); return;
     }
   } catch(e) {
     if (e.name === 'AbortError') return;
-    // Fall through to Piped channel fallback
   }
 
-  // Fallback: channel videos via Piped (no MusicBrainz data or no albums found)
+  // Fallback: Piped channel videos
   if (artist.channelId) {
     box.innerHTML = `<div class="empty">Loading videos by <strong>${esc(artist.name)}</strong>…</div>`;
     try {
@@ -1442,7 +1447,7 @@ async function discSelectArtist(artist) {
       renderDiscView();
     } catch { box.innerHTML = '<div class="empty">Could not load releases</div>'; }
   } else {
-    box.innerHTML = '<div class="empty">No releases found</div>';
+    box.innerHTML = '<div class="empty">No albums found</div>';
   }
 }
 
@@ -1493,7 +1498,11 @@ function renderDiscView() {
     const grid = document.createElement('div'); grid.className = 'artist-grid';
     discState.rels.forEach(a => {
       const card = document.createElement('div'); card.className = 'artist-card';
-      card.innerHTML = `<div class="a-av">${esc(a.name[0].toUpperCase())}</div><div class="a-name" title="${esc(a.name)}">${esc(a.name)}</div>`;
+      const avatarHtml = a.img
+        ? `<div class="a-av" style="overflow:hidden;padding:0"><img src="${esc(a.img)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentNode.innerHTML='${esc(a.name[0].toUpperCase())}'"></div>`
+        : `<div class="a-av">${esc(a.name[0].toUpperCase())}</div>`;
+      const matchHtml = a.match != null ? `<div class="a-rel">${a.match}% match</div>` : '';
+      card.innerHTML = `${avatarHtml}<div class="a-name" title="${esc(a.name)}">${esc(a.name)}</div>${matchHtml}`;
       card.onclick = () => discSelectArtist(a);
       grid.appendChild(card);
     });
@@ -1510,15 +1519,15 @@ function renderDiscView() {
     box.appendChild(hdr);
 
     if (discState.albumsType === 'videos') {
-      // Piped channel fallback: render as video list
       discState.albums.forEach(item => item.ytVideo && box.appendChild(makeResultItem(item.ytVideo)));
     } else {
-      // MusicBrainz albums: render as cover art grid
       const grid = document.createElement('div'); grid.className = 'album-grid';
       discState.albums.forEach(album => {
         const card = document.createElement('div'); card.className = 'album-card';
-        const imgSrc = `https://coverartarchive.org/release-group/${album.mbid}/front-250`;
-        card.innerHTML = `<div class="alb-cover" style="position:relative">♫<img src="${esc(imgSrc)}" loading="lazy" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()"></div><div class="alb-info"><div class="alb-title" title="${esc(album.title)}">${esc(album.title)}</div><div class="alb-year">${esc(album.year)}</div></div>`;
+        const coverHtml = album.img
+          ? `<div class="alb-cover"><img src="${esc(album.img)}" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.innerHTML='♫'"></div>`
+          : `<div class="alb-cover">♫</div>`;
+        card.innerHTML = `${coverHtml}<div class="alb-info"><div class="alb-title" title="${esc(album.title)}">${esc(album.title)}</div><div class="alb-year">${esc(album.year)}</div></div>`;
         card.onclick = () => discSelectAlbum(album);
         grid.appendChild(card);
       });
@@ -1706,8 +1715,8 @@ async function fetchInfo(v) {
   const query = isGame ? (artist || v.channelTitle) : (artist || v.channelTitle);
   if (!query || query.length < 2) return;
   try {
-    if (lastFmKey && !isGame) {
-      const r = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(query)}&api_key=${lastFmKey}&format=json`, { signal: sig });
+    if (!isGame) {
+      const r = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(query)}&api_key=${LASTFM_KEY}&format=json`, { signal: sig });
       if (r.ok) {
         const d = await r.json();
         const a = d.artist;
