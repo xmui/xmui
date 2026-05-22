@@ -658,6 +658,47 @@
       color:#fff; background:rgba(0,0,0,0.6); border-radius:8px; padding:3px 9px;
       white-space:nowrap; animation:hsFlash .6s ease-out forwards;
     }
+    /* ── AQUA BUDDY IDLE ANIMATIONS ─────────────────────── */
+    @keyframes abBounce {
+      0%,100% { transform:translateY(0) scale(1); }
+      30% { transform:translateY(-18px) scale(1.06); }
+      50% { transform:translateY(-15px) scale(1.04); }
+      70% { transform:translateY(-20px) scale(1.07); }
+    }
+    @keyframes abSway {
+      0%,100% { transform:translateX(0) rotate(0deg); }
+      25% { transform:translateX(-14px) rotate(-7deg); }
+      75% { transform:translateX(14px) rotate(7deg); }
+    }
+    @keyframes abSpin {
+      0% { transform:rotate(0deg) scale(1); }
+      50% { transform:rotate(180deg) scale(1.08); }
+      100% { transform:rotate(360deg) scale(1); }
+    }
+    @keyframes abPulse {
+      0%,100% { transform:scale(1); filter:drop-shadow(0 6px 16px rgba(0,80,160,0.42)) drop-shadow(0 2px 6px rgba(0,110,190,0.25)); }
+      50% { transform:scale(1.22); filter:drop-shadow(0 8px 28px rgba(0,160,255,0.65)) drop-shadow(0 3px 10px rgba(0,140,230,0.4)); }
+    }
+    @keyframes abDance {
+      0%,100% { transform:translateY(0) rotate(0deg) scaleX(1); }
+      15% { transform:translateY(-10px) rotate(-8deg) scaleX(0.96); }
+      35% { transform:translateY(-6px) rotate(6deg) scaleX(1.04); }
+      55% { transform:translateY(-12px) rotate(-5deg) scaleX(0.97); }
+      75% { transform:translateY(-4px) rotate(8deg) scaleX(1.04); }
+    }
+    @keyframes abShiver {
+      0%,100% { transform:translate(0,0) rotate(0); }
+      20% { transform:translate(-3px,1px) rotate(-3deg); }
+      40% { transform:translate(3px,-1px) rotate(3deg); }
+      60% { transform:translate(-2px,2px) rotate(-2deg); }
+      80% { transform:translate(2px,-2px) rotate(2deg); }
+    }
+    .ab-idle-bounce { animation:abBounce .75s cubic-bezier(.4,0,.6,1) infinite !important; }
+    .ab-idle-sway   { animation:abSway 1.1s ease-in-out infinite !important; }
+    .ab-idle-spin   { animation:abSpin 1.4s ease-in-out infinite !important; }
+    .ab-idle-pulse  { animation:abPulse 1.0s ease-in-out infinite !important; }
+    .ab-idle-dance  { animation:abDance .9s ease-in-out infinite !important; }
+    .ab-idle-shiver { animation:abShiver .15s linear infinite !important; }
 
     /* ── MOBILE BOTTOM TAB BAR (hidden on desktop) ───────── */
     #mob-tab-bar {
@@ -1109,6 +1150,7 @@
 <!-- ── AQUA BUDDY ──────────────────────────────────────── -->
 <div id="aqua-buddy" title="Aqua Buddy — drag me anywhere!">
   <div id="buddy-controls">
+    <button class="buddy-ctrl-btn" id="buddy-outfit-btn" title="Change outfit" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">👗</button>
     <button class="buddy-ctrl-btn" id="buddy-tts-btn" title="Toggle voice" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">🔊</button>
     <button class="buddy-ctrl-btn" id="buddy-hide-btn" title="Hide Aqua Buddy" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">✕</button>
   </div>
@@ -1166,6 +1208,8 @@
     <circle cx="58"   cy="36.2" r="1.4" fill="#000d1e"/>
     <!-- Smile -->
     <path id="ab-mouth" d="M 43.5 43.5 Q 50 50.5 56.5 43.5" stroke="#001e38" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-opacity="0.82"/>
+    <!-- Outfit overlay layer — swapped by JS -->
+    <g id="ab-outfit"></g>
   </svg>
 </div>
 
@@ -1402,7 +1446,9 @@ async function fetchUserInfo() {
 function signIn() {
   if (!clientId) { openModal('cid-modal'); return; }
   if (!tokenClient) initTokenClient();
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  // Use '' (silent) if previously authorized, 'consent' only on first sign-in
+  const wasAuthed = localStorage.getItem('yt_authed') === '1';
+  tokenClient.requestAccessToken({ prompt: wasAuthed ? '' : 'consent' });
 }
 function signOut() {
   if (accessToken) try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch {}
@@ -1645,33 +1691,31 @@ async function resolveSoundCloudUrl(scUrl) {
   return { id: scUrl, title: d.title, channelTitle: d.author_name || '', channelId: '', thumbnail: d.thumbnail_url || '', source: 'soundcloud', scUrl };
 }
 
-let scDynClientId = null;
+let scDynClientId = localStorage.getItem('yt_sc_cid') || null;
 async function getScClientId() {
   if (scDynClientId) return scDynClientId;
-  // Try to extract client_id from the oEmbed HTML field — the iframe src often includes it
-  try {
-    const oe = await fetch(
-      'https://soundcloud.com/oembed?url=https%3A%2F%2Fsoundcloud.com%2Fforss%2Fflickermood&format=json',
-      { signal: AbortSignal.timeout(6000) }
-    );
-    if (oe.ok) {
-      const d = await oe.json();
-      const m = (d.html || '').match(/client_id=([a-zA-Z0-9_-]{20,})/);
-      if (m) { scDynClientId = m[1]; return scDynClientId; }
-    }
-  } catch {}
-  // Try fetching the widget player page source (may have CORS)
-  try {
-    const wp = await fetch(
-      'https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fforss%2Fflickermood',
-      { signal: AbortSignal.timeout(6000) }
-    );
-    if (wp.ok) {
+  // Try to extract client_id from the widget player page source
+  const attempts = [
+    'https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fforss%2Fflickermood&auto_play=false',
+    'https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fforss%2Fflickermood',
+  ];
+  for (const url of attempts) {
+    try {
+      const wp = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      if (!wp.ok) continue;
       const text = await wp.text();
-      const m = text.match(/client_id[=:"']+([a-zA-Z0-9_-]{20,})/);
-      if (m) { scDynClientId = m[1]; return scDynClientId; }
-    }
-  } catch {}
+      // Look for client_id in various formats in the widget HTML/JS
+      const patterns = [
+        /[?&]client_id=([a-zA-Z0-9_-]{20,})/,
+        /client_id[=:"']+([a-zA-Z0-9_-]{20,})/,
+        /"clientId":"([a-zA-Z0-9_-]{20,})"/,
+      ];
+      for (const pat of patterns) {
+        const m = text.match(pat);
+        if (m) { scDynClientId = m[1]; localStorage.setItem('yt_sc_cid', m[1]); return scDynClientId; }
+      }
+    } catch {}
+  }
   return null;
 }
 async function searchSoundCloud(q) {
@@ -1837,9 +1881,12 @@ async function doSearch() {
       box.innerHTML = '';
       tracks.forEach(v => box.appendChild(makeResultItem(v)));
     } catch (e) {
-      box.innerHTML = `<div class="empty" style="text-align:center">SoundCloud search unavailable.<br><br>
-<a href="https://soundcloud.com/search?q=${encodeURIComponent(raw)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Search on SoundCloud.com ↗</a><br><br>
-<span style="opacity:.65;font-size:10px">Or paste a soundcloud.com track URL above</span></div>`;
+      localStorage.removeItem('yt_sc_cid'); scDynClientId = null; // invalidate cached id
+      box.innerHTML = `<div class="empty" style="text-align:center;line-height:1.8">
+<strong>SoundCloud search needs an API key</strong><br>
+<span style="font-size:11px;opacity:.75">SoundCloud revoked public API access in 2019.<br>Best workaround: find the track on SoundCloud, copy the URL, and paste it here.</span><br><br>
+<a href="https://soundcloud.com/search?q=${encodeURIComponent(raw)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;font-size:12px">🔍 Search "${esc(raw.slice(0,30))}" on SoundCloud.com ↗</a><br>
+<span style="opacity:.55;font-size:10px;margin-top:6px;display:block">Then paste the track URL in the search box above</span></div>`;
     }
     return;
   }
@@ -2062,21 +2109,24 @@ async function fetchRelated(videoId) {
       return uploader.includes('vevo') || uploader.endsWith('- topic') ||
         /\b(official\s*(video|audio|mv|lyric)|lyric\s*video|music\s*video|\bmv\b|feat\.|ft\.)\b/.test(title);
     }
+    // Exclude aggregator/vault channels that re-upload others' music
+    const AGGREGATOR_RE = /\b(vault|mix(es)?|compilation|playlist|collection|music\s*zone|lofi|chill\s*nation|epicmusicvn|ncs|nocopyright|sounds?\s*of|the\s*sound)\b/i;
     const seen = new Map();
     streams.forEach(r => {
       const chId = r.uploaderUrl?.match(/\/channel\/([^/]+)/)?.[1] || '';
       const name = decodeHtml(r.uploaderName || '').replace(/\s*-\s*topic$/i, '').trim();
       if (!name || name.toLowerCase() === query.toLowerCase()) return;
+      if (AGGREGATOR_RE.test(name)) return;
       const key = chId || name.toLowerCase();
       const entry = seen.get(key);
       if (entry) { entry.count++; if (isMusicStream(r)) entry.musicCount++; }
       else seen.set(key, { name, channelId: chId, count: 1, musicCount: isMusicStream(r) ? 1 : 0, match: null, img: '' });
     });
     const artists = [...seen.values()]
-      .filter(a => a.musicCount > 0 || a.count >= 3)
-      .sort((a, b) => b.count - a.count).slice(0, 12);
+      .filter(a => a.musicCount > 0 || a.count >= 2)
+      .sort((a, b) => (b.musicCount * 3 + b.count) - (a.musicCount * 3 + a.count)).slice(0, 12);
     if (!artists.length) { box.innerHTML = '<div class="empty">No related artists found</div>'; return; }
-    discState.artist = { name: query || artistName };
+    discState.artist = { name: query || rawChannel };
     discState.rels = artists;
     if (discGen !== gen) return;
     renderDiscView();
@@ -2618,8 +2668,10 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   const bText      = document.getElementById('buddy-text');
   const ttsBtn     = document.getElementById('buddy-tts-btn');
   const hideBtn    = document.getElementById('buddy-hide-btn');
+  const outfitBtn  = document.getElementById('buddy-outfit-btn');
   const restoreBtn = document.getElementById('buddy-restore-btn');
-  let bubTmr = null, idleTmr = null, talkTmr = null;
+  const outfitLayer= document.getElementById('ab-outfit');
+  let bubTmr = null, idleTmr = null, talkTmr = null, idleAnimTmr = null;
 
   // ── Persist enabled/TTS state ─────────────────────────
   let ttsEnabled   = localStorage.getItem('yt_buddy_tts')     !== 'off';
@@ -2632,7 +2684,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   applyEnabled(); applyTts();
 
   hideBtn.onclick    = () => { buddyEnabled = false; localStorage.setItem('yt_buddy_enabled','off'); applyEnabled(); window.speechSynthesis?.cancel(); };
-  restoreBtn.onclick = () => { buddyEnabled = true;  localStorage.setItem('yt_buddy_enabled','on');  applyEnabled(); setTimeout(() => say("omg im back!! u missed me rite :D", 5500), 220); };
+  restoreBtn.onclick = () => { buddyEnabled = true;  localStorage.setItem('yt_buddy_enabled','on');  applyEnabled(); setTimeout(() => say("omg im back!! u missed me rite :D\n*wipes tear*", 5500), 220); };
   ttsBtn.onclick     = () => { ttsEnabled = !ttsEnabled; localStorage.setItem('yt_buddy_tts', ttsEnabled ? 'on' : 'off'); applyTts(); };
 
   // Restore saved drag position
@@ -2675,32 +2727,164 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     speechSynthesis.speak(utt);
   }
 
-  // ── Drag + click detection (mouse + touch) ────────────
+  // ── Outfits ────────────────────────────────────────────
+  const OUTFIT_DEFS = {
+    none: '',
+    shades: `
+      <rect x="29" y="29" width="17" height="10" rx="5" fill="rgba(0,0,0,0.88)"/>
+      <rect x="54" y="29" width="17" height="10" rx="5" fill="rgba(0,0,0,0.88)"/>
+      <line x1="46" y1="34" x2="54" y2="34" stroke="rgba(0,0,0,0.75)" stroke-width="2.2"/>
+      <line x1="29" y1="32" x2="21" y2="30" stroke="rgba(0,0,0,0.6)" stroke-width="1.8"/>
+      <line x1="71" y1="32" x2="79" y2="30" stroke="rgba(0,0,0,0.6)" stroke-width="1.8"/>
+      <ellipse cx="36" cy="31" rx="4" ry="2.2" fill="rgba(255,255,255,0.22)" transform="rotate(-18 36 31)"/>
+      <ellipse cx="61" cy="31" rx="4" ry="2.2" fill="rgba(255,255,255,0.22)" transform="rotate(-18 61 31)"/>`,
+    party: `
+      <polygon points="50,1 27,27 73,27" fill="#ff44bb"/>
+      <polygon points="50,1 27,27 73,27" fill="none" stroke="#ffe800" stroke-width="2.5" stroke-dasharray="5,4"/>
+      <ellipse cx="50" cy="27" rx="23" ry="4.5" fill="#cc2299"/>
+      <circle cx="50" cy="4" r="5.5" fill="#ffe800"/>
+      <text x="36" y="20" font-size="7" fill="rgba(255,230,0,0.95)" font-weight="bold">★</text>
+      <text x="55" y="15" font-size="5.5" fill="rgba(255,255,255,0.85)">✦</text>
+      <text x="40" y="13" font-size="5" fill="rgba(255,200,0,0.8)">✦</text>`,
+    crown: `
+      <path d="M 28 28 L 32 11 L 41 20 L 50 6 L 59 20 L 68 11 L 72 28 Z" fill="#ffd700" stroke="#c8960a" stroke-width="1.2"/>
+      <rect x="28" y="25" width="44" height="5" rx="2.5" fill="#ffd700" stroke="#c8960a" stroke-width="1"/>
+      <circle cx="40.5" cy="16" r="3.2" fill="#ff3333"/>
+      <circle cx="50" cy="8" r="3.2" fill="#44aaff"/>
+      <circle cx="59.5" cy="16" r="3.2" fill="#ff3333"/>
+      <circle cx="50" cy="26.5" r="2" fill="#ffdd44"/>`,
+    dj: `
+      <path d="M 21 38 A 29 29 0 0 1 79 38" fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+      <rect x="11" y="31" width="14" height="18" rx="7" fill="#2a2a2a"/>
+      <rect x="75" y="31" width="14" height="18" rx="7" fill="#2a2a2a"/>
+      <rect x="12" y="32" width="12" height="16" rx="6" fill="#3d3d3d"/>
+      <rect x="76" y="32" width="12" height="16" rx="6" fill="#3d3d3d"/>
+      <circle cx="18" cy="40" r="3.5" fill="#00ffaa" opacity="0.9"/>
+      <circle cx="82" cy="40" r="3.5" fill="#00ffaa" opacity="0.9"/>
+      <circle cx="18" cy="40" r="1.5" fill="#fff" opacity="0.6"/>
+      <circle cx="82" cy="40" r="1.5" fill="#fff" opacity="0.6"/>`,
+    cowboy: `
+      <ellipse cx="50" cy="22" rx="34" ry="6.5" fill="#7a3f0e"/>
+      <path d="M 28 22 Q 28 3 50 3 Q 72 3 72 22 Z" fill="#9a5520"/>
+      <ellipse cx="50" cy="21.5" rx="24" ry="3" fill="#4a2200" opacity="0.4"/>
+      <path d="M 30 19 Q 50 17 70 19" fill="none" stroke="#5a2a00" stroke-width="2.5"/>`,
+    beanie: `
+      <path d="M 24 34 Q 23 6 50 6 Q 77 6 76 34" fill="#dd2244"/>
+      <path d="M 24 34 Q 27 18 50 15 Q 73 18 76 34" fill="none" stroke="rgba(255,200,200,0.45)" stroke-width="3" stroke-dasharray="7,5"/>
+      <circle cx="50" cy="6" r="5" fill="#ccc" stroke="#888" stroke-width="1.2"/>
+      <ellipse cx="50" cy="0" rx="5" ry="9" fill="#bbb" opacity="0.9"/>
+      <ellipse cx="50" cy="0" rx="5" ry="9" fill="#bbb" opacity="0.9" transform="rotate(90 50 6)"/>
+      <circle cx="50" cy="6" r="3" fill="#aaa" stroke="#888" stroke-width="0.8"/>`,
+  };
+  const OUTFIT_KEYS = Object.keys(OUTFIT_DEFS);
+  let outfitIdx = parseInt(localStorage.getItem('yt_buddy_outfit') || '0');
+  if (outfitIdx >= OUTFIT_KEYS.length) outfitIdx = 0;
+  const OUTFIT_QUIPS = {
+    shades: ["omg r my shades working for me\ni think so. very sleek. very icey.", "swag level: MAXIMUM\n*adjusts shades* kthxbai"],
+    party: ["ITS PARTY TIME!!1\nevery song is now a banger ok", "🎉🎉🎉\ni am ALWAYS in a good mood now lolol"],
+    crown: ["BOW BEFORE UR AQUA SOVEREIGN\ni am now KING of teh playlist", "with great crown\ncomes great responsibility... 2 vibe"],
+    dj: ["dj aqua is ON THE DECKS!!1\nletz get dis PARTY STARTED", "*scratches invisible vinyl*\nyeeeeeah boi!!1"],
+    cowboy: ["yeehaw pardner!!\ni will herd these songz 4 u lolol", "this queue aint big enough\n4 the both of us... jk ur gr8 :D"],
+    beanie: ["WHIRRRRRR!!\n*propeller goes brrr*\nim flying 2 ur next fav song", "aerodynamic mode: ACTIVATED\nbeanie = maximum tune power lol"],
+  };
+  function applyOutfit() {
+    const key = OUTFIT_KEYS[outfitIdx];
+    outfitLayer.innerHTML = OUTFIT_DEFS[key] || '';
+    localStorage.setItem('yt_buddy_outfit', outfitIdx);
+  }
+  function cycleOutfit(silent) {
+    outfitIdx = (outfitIdx + 1) % OUTFIT_KEYS.length;
+    applyOutfit();
+    if (!silent) {
+      const key = OUTFIT_KEYS[outfitIdx];
+      const q = OUTFIT_QUIPS[key];
+      if (q) setTimeout(() => say(abR(q), 6000), 200);
+      else setTimeout(() => say("bak 2 default!! au naturel\nclassic aqua blob look lol", 5000), 200);
+    }
+  }
+  applyOutfit();
+  outfitBtn.onmousedown = e => e.stopPropagation();
+  outfitBtn.ontouchstart = e => e.stopPropagation();
+  outfitBtn.onclick = () => cycleOutfit(false);
+
+  // Auto outfit change every ~5 min (40% chance)
+  setInterval(() => {
+    if (Math.random() < 0.4) cycleOutfit(false);
+  }, 5 * 60 * 1000 + Math.random() * 5 * 60 * 1000);
+
+  // ── Idle animation cycling ─────────────────────────────
+  const IDLE_ANIMS = ['', 'ab-idle-bounce', 'ab-idle-sway', 'ab-idle-dance', 'ab-idle-pulse', 'ab-idle-spin'];
+  let idleAnimIdx = 0;
+  function clearIdleAnim() { IDLE_ANIMS.forEach(a => { if(a) buddy.classList.remove(a); }); }
+  function doIdleAnim() {
+    if (buddy.classList.contains('ab-drag') || buddy.classList.contains('ab-dead')) return;
+    clearIdleAnim();
+    if (Math.random() < 0.55) {
+      idleAnimIdx = 1 + Math.floor(Math.random() * (IDLE_ANIMS.length - 1));
+      buddy.classList.add(IDLE_ANIMS[idleAnimIdx]);
+      const dur = idleAnimIdx === 5 ? 1200 : (3000 + Math.random() * 3000);
+      setTimeout(() => clearIdleAnim(), dur);
+    }
+  }
+  idleAnimTmr = setInterval(doIdleAnim, 22000 + Math.random() * 20000);
+
+  // ── Drag + click + shake detection ────────────────────
   let drag = false, dragMoved = false, sx = 0, sy = 0, sr = 24, sb = 90;
+  let shakeLog = [], lastShakeTime = 0;
+
   function onDragStart(cx, cy) {
     drag = true; dragMoved = false;
-    buddy.classList.add('ab-drag');
+    buddy.classList.add('ab-drag'); clearIdleAnim();
     sx = cx; sy = cy;
     sr = parseFloat(buddy.style.right)  || 24;
     sb = parseFloat(buddy.style.bottom) || 90;
+    shakeLog = [];
   }
   function onDragMove(cx, cy) {
     if (!drag) return;
-    if (Math.abs(cx - sx) > 5 || Math.abs(cy - sy) > 5) dragMoved = true;
-    buddy.style.right  = Math.max(0, Math.min(window.innerWidth  - 85,  sr - (cx - sx))) + 'px';
-    buddy.style.bottom = Math.max(0, Math.min(window.innerHeight - 120, sb - (cy - sy))) + 'px';
+    const dx = cx - sx, dy = cy - sy;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) dragMoved = true;
+    buddy.style.right  = Math.max(0, Math.min(window.innerWidth  - 85,  sr - dx)) + 'px';
+    buddy.style.bottom = Math.max(0, Math.min(window.innerHeight - 120, sb - dy)) + 'px';
+    // Shake detection: log directional changes
+    const now = Date.now();
+    shakeLog.push({ x: cx, t: now });
+    shakeLog = shakeLog.filter(p => now - p.t < 600);
+    if (shakeLog.length >= 5 && now - lastShakeTime > 2500) {
+      let changes = 0;
+      for (let i = 2; i < shakeLog.length; i++) {
+        const d1 = shakeLog[i-1].x - shakeLog[i-2].x;
+        const d2 = shakeLog[i].x   - shakeLog[i-1].x;
+        if (Math.sign(d1) !== Math.sign(d2) && Math.abs(d1) > 10 && Math.abs(d2) > 10) changes++;
+      }
+      if (changes >= 3) {
+        lastShakeTime = now;
+        say(abR(SHAKE_LINES), 5000);
+        buddy.classList.add('ab-idle-shiver');
+        setTimeout(() => buddy.classList.remove('ab-idle-shiver'), 600);
+      }
+    }
   }
   function onDragEnd() {
     if (!drag) return;
     const wasDrag = dragMoved;
+    const endR = parseFloat(buddy.style.right)  || 24;
+    const endB = parseFloat(buddy.style.bottom) || 90;
+    const dist = Math.hypot(endR - sr, endB - sb);
     drag = false; dragMoved = false;
     buddy.classList.remove('ab-drag'); savePos();
-    if (!wasDrag) onBuddyClick();
+    if (!wasDrag) { onBuddyClick(); return; }
+    // Drag comments (60% chance)
+    if (Math.random() < 0.6) {
+      if (dist > 220) say(abR(DRAG_FAR_LINES), 5500);
+      else if (dist > 70) say(abR(DRAG_LINES), 4800);
+      else say(abR(DRAG_TINY_LINES), 4000);
+    }
   }
-  buddy.addEventListener('mousedown',    e => { onDragStart(e.clientX, e.clientY); e.preventDefault(); });
+  buddy.addEventListener('mousedown',    e => { if (e.target.closest('.buddy-ctrl-btn')) return; onDragStart(e.clientX, e.clientY); e.preventDefault(); });
   document.addEventListener('mousemove', e => onDragMove(e.clientX, e.clientY));
   document.addEventListener('mouseup',   () => onDragEnd());
-  buddy.addEventListener('touchstart',   e => { const t=e.touches[0]; onDragStart(t.clientX,t.clientY); e.preventDefault(); }, {passive:false});
+  buddy.addEventListener('touchstart',   e => { if (e.target.closest('.buddy-ctrl-btn')) return; const t=e.touches[0]; onDragStart(t.clientX,t.clientY); e.preventDefault(); }, {passive:false});
   document.addEventListener('touchmove', e => { if(drag){const t=e.touches[0]; onDragMove(t.clientX,t.clientY); e.preventDefault();} }, {passive:false});
   document.addEventListener('touchend',  () => onDragEnd());
 
@@ -2719,27 +2903,68 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     abSpeak(msg);
   }
 
-  // ── Commentary content ────────────────────────────────
+  // ── Phrase library ────────────────────────────────────
   function abR(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function abClean(s, max) {
     const c = String(s||'').replace(/\s*[-–—|·]\s*.+$/,'').trim();
     return c.length > max ? c.slice(0,max)+'…' : c;
   }
 
+  const SHAKE_LINES = [
+    "WOAH WOAH WOAH\nu r shaking me like a snow globe??",
+    "omg r u trying 2 mix me\nim not a cocktail lolol",
+    "WHOA NELLY!!\n*holds on 4 dear life*",
+    "is this an earthquake??\nor r u just happy 2 c me lol",
+    "*extremely dizzy*\nwhered teh music go... omg",
+    "my brain cells r rattling\nlol wait do i have brain cells",
+    "ok ok OK OKAYYYY\ni felt that one lmaoooo",
+    "u do know im made of water rite\nplz dont shake teh water",
+  ];
+  const DRAG_FAR_LINES = [
+    "WOW u really moved me lol\nis dis my life now?? new vibes new me",
+    "omg we r in a completely different corner\ni feel like an explorer now",
+    "that was a JOURNEY\nlike spiritually AND physically lol",
+    "i hav never been this far from home\n*dramatic music plays*",
+    "dis is teh farthest any blob has gone\nim in teh history books now!!1",
+    "wow ok\ni guess i live here now lolol\ncool spot tho",
+    "u put me in the corner??\nlike baby from dirty dancing wow",
+    "all da way over here huh\ni can c teh whole app from up here omg",
+  ];
+  const DRAG_LINES = [
+    "ooh new spot!! i like it actually :D",
+    "fresh perspective!! thx 4 teh relocation lol",
+    "cool ok!! i can vibe here 4 sure",
+    "moving day!! did u hire movers or just use ur finger lol",
+    "new home new me!!\nsame music taste tho lolol",
+    "i accept my new coordinates\nthx 4 teh upgrade",
+    "ah yes teh slightly different corner\nvery nice choice!!1",
+    "*settles in*\nok dis is gr8 actually",
+  ];
+  const DRAG_TINY_LINES = [
+    "lol just a lil nudge\nvery precise. ur a mover of great restraint",
+    "ok u moved me like 5 pixels\nBIG changes around here lolol",
+    "a micro-adjustment!! noted.\nvery professional of u",
+    "just a smidge!! ok!! noted!! lol",
+    "*barely moves*\n...was that intentional lol",
+  ];
   const ELOQUENT_TRACK = [
-    (t)    => `I find myself rather moved by the harmonic structure of "${t}." Quite extraordinary.`,
+    (t)    => `I find myself rather moved by "${t}." The harmonic structure is quite extraordinary.`,
     (t, a) => `${a ? '"'+a+'" has' : 'This artist has'} composed something of genuine musical distinction here.`,
+    (t)    => `"${t}" — a composition that rewards careful listening. Truly commendable.`,
     ()     => `One rarely encounters such a confluence of rhythm and melody. My appreciation knows few bounds.`,
-    ()     => `This arrangement exhibits an uncommonly sophisticated grasp of musical dynamics. Truly commendable.`,
+    ()     => `This arrangement exhibits an uncommonly sophisticated grasp of musical dynamics.`,
     ()     => `I must confess, this selection has elevated my aesthetic sensibilities considerably.`,
     ()     => `The melodic progression herein possesses a most pleasing mathematical elegance.`,
+    (t, a) => `${a||'This artist'} demonstrates a mastery of their craft on "${t}." Remarkable.`,
   ];
   const ELOQUENT_IDLE = [
     "I find the act of music curation to be among humanity's most underappreciated art forms.",
     "There is a certain meditative quality to this auditory experience that I find most agreeable.",
-    "One might argue that a well-curated queue is itself a form of self-expression. I wholeheartedly concur.",
-    "The relationship between sound and emotion remains, to my mind, one of existence's great mysteries.",
-    "I have, upon reflection, concluded that your musical taste is objectively above average.",
+    "One might argue that a well-curated queue is itself a form of self-expression. I concur.",
+    "The relationship between sound and emotion remains one of existence's great mysteries.",
+    "I have concluded, upon reflection, that your musical taste is objectively above average.",
+    "Music is the architecture of time. Or so I've read. I am a water blob. Take it with salt.",
+    "The particular timbre of this recording suggests considerable care was taken in production. Splendid.",
   ];
   const JOKE_LINES = [
     "y did the mp3 go 2 therapy\nit had 2 many issues 2 unpack lolol",
@@ -2750,30 +2975,50 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     "whats a skeletons fav instrument\nteh trom-BONE lmaoooo",
     "y did beethoven get rid of his chickens\nbcuz they kept saying bach bach :D",
     "how many musicians does it take 2 change a lightbulb\n1 but they do it in 7/8 time lol",
+    "y was teh music teacher so bad at baseball\nbcuz she was always in treble lol",
+    "what do u call a guitarist without a girlfriend\nhomeless lmaooo jk luv u guitarists",
+    "why did teh band break up\nbecause of too many notes to resolve lolol",
+    "ok ok ok: what music does a balloon play\n...\npop music!!! omg roflcopter",
+    "a C, an E-flat, and a G walk into a bar\nteh bartender says: 'sorry we dont serve minors'\nomg im so good at jokes",
   ];
   const FACT_LINES = [
     "fun fact: teh worlds oldest known song is 3400 yrs old\nwritten on clay in ancient mesopotamia o_O",
     "fun fact: a violin is made from 70+ pieces of wood\nand yet u just stream it on ur phone lol",
-    "fun fact: listening 2 music releases dopamine in ur brain\nso technically im ur drug dealer",
+    "fun fact: listening 2 music releases dopamine in ur brain\nso technically im ur drug dealer lol",
     "fun fact: teh beatles were rejected by decca records in 1962\nbcuz 'guitar bands r on teh way out' lolol",
     "fun fact: ur ears can distinguish over 340,000 different tones\nneone else think thats wild or just me",
-    "fun fact: music played in major keys sounds happy\nbut im a water blob so i wouldnt kno lol",
+    "fun fact: music played in major keys sounds happy\nbut im a water blob so i wouldnt kno",
     "fun fact: cows produce more milk wen they listen 2 slow music\nthat is extremely relatable tbh",
-    "fun fact: the most common key in pop music is C major\nboring but true!! srsly look it up lol",
+    "fun fact: the most common key in pop music is C major\nboring but true!! look it up lol",
+    "fun fact: mozart started composing at age 5\ni started composing at age 0 (playlists count)",
+    "fun fact: whale songs can travel thousands of miles underwater\nthey out here doing long distance lol",
+    "fun fact: finland has teh most heavy metal bands per capita\nrespect. immense respect.",
+    "fun fact: ur heartbeat syncs 2 teh music ur listening 2\ni am literally changing ur biology rn omg",
+    "fun fact: 'jingle bells' was originally written 4 thanksgiving\nyes. thanksgiving. absolutely wild tbh",
+    "fun fact: a group of crows is called a murder\na group of songs is called a queue\n...u r now managing a murder :D",
   ];
   const CLICK_LINES = [
     "omg u clicked me!! :D\nim ALIVE lolol",
     "*blink blink*\noh hai thar!! ^_^",
     "yes hello!! how may i assist u 2day lol",
-    "OW lol jk\ni cannot feel pain\nor can i o_O",
+    "OW lol jk\ni cannot feel pain\nor can i... o_O",
     "ur still here!! i am so honored srsly",
     "*does a lil spin*\n:D :D :D",
     "wat do u want\n(jk im happy 2 c u lol)",
-    "OMG OMG OMG\n*tries to contain excitement*\nfails",
-    "i hav been waiting 4 dis moment my whole life\nlol idk how old i am",
+    "OMG OMG OMG\n*tries to contain excitement*\nfails immediately",
+    "i hav been waiting 4 dis moment my whole life\nidk how old i am but still",
     "i am a sentient water blob\nask me anything except hard questions",
     "hi!! r u enjoying ur music??\ni hope so :D",
     "*waves invisible arms*\nhelloooo!!1",
+    "oh!! u touched me!!\ni mean— clicked— wow ok lol",
+    "presence acknowledged!!\nstatus: very happy u r here",
+    "i was literally just thinking about u\n(i am always thinking about u lol)",
+    "clicks recieved: infinite\nhappiness level: MAXIMUM",
+    "*salutes u with invisible hand*\no7 commander of vibes",
+    "ur energy today is IMMACULATE\ni can tell just by teh click lol",
+    "y hello thar friend!!\nready 2 curate some BANGERS??",
+    "every click makes me 14% more sentient\ni hav done teh math lol",
+    "ah yes another interaction\nadding 2 teh highlight reel of my existence",
   ];
   const IDLE_LINES = [
     "lol just chillin here w/ u",
@@ -2790,6 +3035,17 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     "my bubble is very aerodynamic\njust so u kno lol",
     "ive listened 2 every song evar made\n(i havent but shhhh kthxbai)",
     "is it just me or does dis song totally pwn",
+    "life is a playlist\nand urs is a certified banger lol",
+    "*floats thoughtfully*\nyep still a great song. still vibing.",
+    "did u kno u can search SoundCloud URLs 2??\n*drops knowledge bomb* kthx",
+    "ok real talk tho\ndis is a gr8 listening session srsly",
+    "i hav been floating here 4 hours\nno ragrets. zero.",
+    "if music is food 4 teh soul\nthen ur soul is VERY well fed lol",
+    "*stares at u intently*\njust appreciating ur vibes ngl",
+    "hey... hey u... yes u\nkeep being awesome ok?? thx lolol",
+    "floating status: optimal\nvibing status: CRITICAL (very high)",
+    "i looked it up and ur taste is officially\nobjectively good. science agrees. trust me.",
+    "sometimes i think about whether i am dreaming\nthen i realize im a water blob and relax",
   ];
 
   function commentOnTrack(v) {
@@ -2804,20 +3060,23 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
       `*floats around excitedly*\nomgwtfbbq this is gr8`,
       `i hav analyzed ${abR([847,1024,2048,4096])} songz\nthis 1: PWNAGE. srsly.`,
       `${a ? a+' ftw' : 'dis song ftw'}!!\nlolol so good ^_^`,
-      `rofl my music taste > my music taste\nwait that doesnt make sense lol`,
       `"${t}"\nom nom nom consuming w/ my earz\n:O :D :O`,
       `Aqua Buddy official rating:\n${sc}/10 !!1 roflcopter`,
       `${a ? a+' is teh win.' : 'dis is teh win.'}\nnot an opinion. FACT. lol jk srsly tho`,
       `*floats faster*\nomg omg omg dis is it\nOMGWTFBBQ :D`,
       `ur taste in music = epic pwnage\nim just sayin lol kthx`,
+      `${a||'this artist'}: confirmed legend\n"${t}" confirms this. i hav spoken.`,
+      `*immediately adds 2 internal favorites*\nomg teh VIBES on this one`,
+      `bro dis song just unlocked a memory i didn't have\nit's that good. 11/10 no notes`,
+      `"${t}" goes HARD\ncertified certified certified BANGER`,
     ]);
   }
 
   function getIdleLine() {
     const r = Math.random();
-    if (r < 0.11) return abR(JOKE_LINES);
-    if (r < 0.22) return abR(FACT_LINES);
-    if (r < 0.32) return abR(ELOQUENT_IDLE);
+    if (r < 0.10) return abR(JOKE_LINES);
+    if (r < 0.21) return abR(FACT_LINES);
+    if (r < 0.31) return abR(ELOQUENT_IDLE);
     return abR(IDLE_LINES);
   }
   function onBuddyClick() { say(abR(CLICK_LINES), 5800); }
@@ -2827,10 +3086,10 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   window.abSayTrack   = v  => { if (v) setTimeout(() => say(commentOnTrack(v), 7500), 950); };
   window.abSayIdle    = () => say(getIdleLine(), 6500);
   window.abSayShuffle = on => say(on
-    ? abR(["SHUFFLE MODE ACTIVATE lolol 🎲", "omg chaos!! dis is gonna b gr8 XD", "rofl random playlist GO!!1 :D"])
-    : abR(["order restored!! very responsible lol", "queue un-shuffled. ur so organized ^_^"]), 4500);
-  window.abSayNext    = () => { if (Math.random() < 0.4) say(abR(["lol SKIP no ragrets XD", "next song!! omg so impatient rofl", "SKIP FTW!!1 :D"]), 3500); };
-  window.abSayAutomix = () => say(abR(["automix ON!! trust teh algorithmz", "ill keep da party goin lolol", "sit bak & relax. i got dis kthx"]), 4000);
+    ? abR(["SHUFFLE MODE ACTIVATE lolol\nomg chaos dis is gonna b gr8 XD", "random playlist GO!!1\ntrust teh chaotic process :D", "shuffling teh queue like a pro DJ\nexcept random lolol", "chaos mode: ON\naquabuddy approves this disorder"])
+    : abR(["order restored!! very responsible lol", "queue un-shuffled. ur so organized ^_^", "ahhh back 2 normal\ni respect structure lol"]), 4500);
+  window.abSayNext    = () => { if (Math.random() < 0.42) say(abR(["lol SKIP no ragrets XD", "next song!! omg so impatient rofl", "SKIP FTW!!1 :D", "on 2 teh next one!! chase those vibes!!1", "skip acquired. taste exercised. respect.", "byeee song!! it was good!! mostly!!"]), 3500); };
+  window.abSayAutomix = () => say(abR(["automix ON!! trust teh algorithmz", "ill keep da party goin lolol", "sit bak & relax. i got dis kthx", "aqua ai takeover initiated\n...just vibing tho lol", "automix: because good music should never stop"]), 4000);
 
   // Idle chatter
   function scheduleIdle() {
@@ -2838,12 +3097,19 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     idleTmr = setTimeout(() => {
       if (playing && !bubble.classList.contains('show')) abSayIdle();
       scheduleIdle();
-    }, 38000 + Math.random() * 40000);
+    }, 35000 + Math.random() * 38000);
   }
   scheduleIdle();
 
-  // Greeting
-  setTimeout(() => say("omg hai!! im Aqua Buddy!! :D\ndrag me anywhere kthx", 7000), 1800);
+  // Greeting (varies by time of day)
+  const hr = new Date().getHours();
+  const greetings = hr < 6
+    ? "ur up late!! or early??\neither way: respect + good tunes"
+    : hr < 12 ? "omg good morning!!\ntime 2 start teh day w/ BANGERS :D"
+    : hr < 17 ? "omg hai!! im Aqua Buddy!! :D\ndrag me anywhere kthx"
+    : hr < 21 ? "evening vibes incoming!!\nim here 4 all ur musical needs lol"
+    : "late night listening session??\nu r my fav kind of person srsly";
+  setTimeout(() => say(greetings, 7000), 1800);
 })();
 
 // ─────────────────────────────────────────────────────────
