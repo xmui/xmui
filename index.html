@@ -2015,9 +2015,13 @@ function titleTooSimilar(a, b) {
 
 async function fetchRelated(videoId) {
   const gen = ++discGen;
-  const artistName = (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim();
+  const rawChannel = (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim();
   const parsedArtist = parseTitle(current?.title || '').artist;
-  const query = artistName || parsedArtist || '';
+  // Prefer artist from title ("Boards of Canada - Music Is Math" → "Boards of Canada").
+  // Only trust channelTitle directly for YouTube Topic or VEVO channels; otherwise it's
+  // likely an uploader/vault channel unrelated to the actual artist.
+  const isTrustedChannel = /\s*-\s*topic$/i.test(current?.channelTitle || '') || /vevo$/i.test(current?.channelTitle || '');
+  const query = parsedArtist || (isTrustedChannel ? rawChannel : '') || rawChannel;
 
   Object.assign(discState, { view:'artists', artist:null, rels:null, albums:null, albumsType:'albums', album:null, ytResults:null });
   renderDiscNav();
