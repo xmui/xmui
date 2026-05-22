@@ -93,7 +93,7 @@
     }
     #logo img {
       height:32px; width:auto;
-      filter: drop-shadow(0 0 14px rgba(255,255,255,0.45)) drop-shadow(0 1px 4px rgba(0,60,160,0.3));
+      filter: drop-shadow(0 3px 8px rgba(0,0,0,0.55)) drop-shadow(0 0 12px rgba(255,255,255,0.38));
       transition: filter .15s;
     }
     #logo:active img { filter: drop-shadow(0 0 22px rgba(255,255,255,0.9)) brightness(1.2); }
@@ -520,6 +520,8 @@
       background:rgba(0,180,220,0.13);color:var(--accent);text-transform:capitalize; }
     .art-bio { font-size:10.5px;color:var(--text2);padding:0 10px 8px;line-height:1.65; }
     .art-bio a { color:var(--accent); }
+    .art-bio-more { background:none;border:none;color:var(--accent);font-size:10px;font-weight:700;cursor:pointer;padding:0 10px 8px;display:block; }
+    .alb-init { font-size:22px;font-weight:800;color:var(--accent); }
     .art-track { display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;transition:background .12s; }
     .art-track:hover { background:rgba(0,180,220,0.07); }
     .art-track-num { font-size:9px;color:var(--text2);width:16px;text-align:right;flex-shrink:0; }
@@ -1027,9 +1029,9 @@
                 <span id="sm-label">YouTube</span> ▾
               </button>
               <div id="sm-menu">
-                <button class="sm-opt active" data-mode="videos"     onclick="setSearchMode('videos')">📹 Videos</button>
-                <button class="sm-opt"        data-mode="playlists"  onclick="setSearchMode('playlists')">📋 Playlists</button>
-                <button class="sm-opt"        data-mode="sc"         onclick="setSearchMode('sc')">☁️ SoundCloud</button>
+                <button class="sm-opt active" data-mode="videos"     onclick="setSearchMode('videos')">Videos</button>
+                <button class="sm-opt"        data-mode="playlists"  onclick="setSearchMode('playlists')">Playlists</button>
+                <button class="sm-opt"        data-mode="sc"         onclick="setSearchMode('sc')">SoundCloud</button>
               </div>
             </div>
           </div>
@@ -1239,8 +1241,8 @@
 <!-- ── AQUA BUDDY ──────────────────────────────────────── -->
 <div id="aqua-buddy" title="Aqua Buddy — drag me anywhere!">
   <div id="buddy-controls">
-    <button class="buddy-ctrl-btn" id="buddy-outfit-btn" title="Change outfit" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">👗</button>
-    <button class="buddy-ctrl-btn" id="buddy-tts-btn" title="Toggle voice" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">🔊</button>
+    <button class="buddy-ctrl-btn" id="buddy-outfit-btn" title="Change outfit" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">Fit</button>
+    <button class="buddy-ctrl-btn" id="buddy-tts-btn" title="Toggle voice" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">TTS</button>
     <button class="buddy-ctrl-btn" id="buddy-hide-btn" title="Hide Aqua Buddy" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">✕</button>
   </div>
   <div id="buddy-bubble"><div id="buddy-text"></div></div>
@@ -1504,11 +1506,13 @@ async function lfmFetch(method, params = {}) {
   return r.json();
 }
 function lfmImg(images, size = 'large') {
+  // Last.fm returns this hash as a generic "no image" placeholder — filter it out
+  const DEFAULT_HASH = '2a96cbd8b46e442fc41c2b86b821562f';
   const order = ['extralarge', 'large', 'medium', 'small', ''];
   const prefer = [size, ...order.filter(s => s !== size)];
   for (const s of prefer) {
     const found = images?.find(i => i.size === s);
-    if (found?.['#text']) return found['#text'];
+    if (found?.['#text'] && !found['#text'].includes(DEFAULT_HASH)) return found['#text'];
   }
   return '';
 }
@@ -1591,7 +1595,7 @@ function tryAutoSignIn() {
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/youtube.readonly openid profile email',
         callback: onTokenResponse,
-        error_callback: () => {}, // silent — never show UI
+        error_callback: (err) => { console.warn('[GIS] Silent auth failed:', err?.type, err?.message || err); },
       });
       tokenClient.requestAccessToken({ prompt: '' });
     } catch {}
@@ -2033,7 +2037,7 @@ async function doSearch() {
       box.innerHTML = `<div class="empty" style="text-align:center;line-height:1.8">
 <strong>SoundCloud search needs an API key</strong><br>
 <span style="font-size:11px;opacity:.75">SoundCloud revoked public API access in 2019.<br>Best workaround: find the track on SoundCloud, copy the URL, and paste it here.</span><br><br>
-<a href="https://soundcloud.com/search?q=${encodeURIComponent(raw)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;font-size:12px">🔍 Search "${esc(raw.slice(0,30))}" on SoundCloud.com ↗</a><br>
+<a href="https://soundcloud.com/search?q=${encodeURIComponent(raw)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;font-size:12px">Search "${esc(raw.slice(0,30))}" on SoundCloud.com ↗</a><br>
 <span style="opacity:.55;font-size:10px;margin-top:6px;display:block">Then paste the track URL in the search box above</span></div>`;
     }
     return;
@@ -2409,8 +2413,8 @@ function renderDiscView() {
       discState.albums.forEach(album => {
         const card = document.createElement('div'); card.className = 'album-card';
         const coverHtml = album.img
-          ? `<div class="alb-cover"><img src="${esc(album.img)}" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.innerHTML='♫'"></div>`
-          : `<div class="alb-cover">♫</div>`;
+          ? `<div class="alb-cover"><img src="${esc(album.img)}" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"></div>`
+          : `<div class="alb-cover alb-init">${esc(album.title[0]?.toUpperCase() || '?')}</div>`;
         card.innerHTML = `${coverHtml}<div class="alb-info"><div class="alb-title" title="${esc(album.title)}">${esc(album.title)}</div><div class="alb-year">${esc(album.year)}</div></div>`;
         card.onclick = () => discSelectAlbum(album);
         grid.appendChild(card);
@@ -2440,6 +2444,26 @@ async function fetchAutomix(videoId) {
       if (!v?.id || v.id === videoId) return true;
       return recentTitles.some(t => titleTooSimilar(t, v.title));
     }
+
+    // Try Last.fm track.getSimilar first — finds genuinely different songs, not re-uploads
+    const { artist, track } = parseTitle(current?.title || '');
+    if (artist && track) {
+      try {
+        const d = await lfmFetch('track.getSimilar', { artist, track, limit: 12, autocorrect: 1 });
+        const similar = (d?.similartracks?.track || []).filter(t =>
+          !recentTitles.some(rt => titleTooSimilar(rt, `${t.artist?.name || ''} ${t.name}`))
+        );
+        if (similar.length) {
+          const pick = similar[Math.floor(Math.random() * Math.min(similar.length, 6))];
+          const q = `${pick.artist?.name || artist} ${pick.name}`;
+          const sr = await pipedRace('search', { q, filter: 'music_songs' });
+          const found = (sr.items || []).map(pipedToVid).find(v => v.id && !isStale(v));
+          if (found) { playVideo(found); toast('Automix: playing similar track'); return; }
+        }
+      } catch {}
+    }
+
+    // Fallback: YouTube related streams / Google API
     let pick;
     if (useGoogle && accessToken) {
       const d = await ytApi('search',{part:'snippet',q:(current?.title||'').split(' ').slice(0,5).join(' '),type:'video',videoCategoryId:'10',maxResults:12});
@@ -2467,15 +2491,17 @@ async function fetchChannel() {
 
   box.innerHTML = '';
 
-  // Fetch info + top tracks in parallel
-  let info = null, topTracks = [];
+  // Fetch info + top tracks + albums in parallel
+  let info = null, topTracks = [], topAlbums = [];
   try {
-    const [infoRes, tracksRes] = await Promise.all([
+    const [infoRes, tracksRes, albumsRes] = await Promise.all([
       lfmFetch('artist.getInfo',      { artist: artistName, autocorrect: 1 }),
       lfmFetch('artist.getTopTracks', { artist: artistName, limit: 10, autocorrect: 1 }),
+      lfmFetch('artist.getTopAlbums', { artist: artistName, limit: 8,  autocorrect: 1 }),
     ]);
-    info      = infoRes.artist;
+    info      = infoRes?.artist;
     topTracks = tracksRes?.toptracks?.track || [];
+    topAlbums = (albumsRes?.topalbums?.album || []).filter(a => a.name && a.name !== '(null)');
   } catch {}
 
   if (!info && !topTracks.length) {
@@ -2483,31 +2509,68 @@ async function fetchChannel() {
   }
 
   // Header: photo + name + tags
-  const img   = lfmImg(info?.image, 'extralarge') || lfmImg(info?.image, 'large');
-  const tags  = (info?.tags?.tag || []).slice(0, 4).map(t => `<span class="art-tag">${esc(t.name)}</span>`).join('');
+  const img  = lfmImg(info?.image, 'extralarge') || lfmImg(info?.image, 'large');
+  const tags = (info?.tags?.tag || []).slice(0, 4).map(t => `<span class="art-tag">${esc(t.name)}</span>`).join('');
   const imgEl = img
-    ? `<img class="art-photo" src="${esc(img)}" alt="${esc(artistName)}" onerror="this.outerHTML='<div class=\\'art-photo-fallback\\'>${esc(artistName[0])}</div>'">`
+    ? `<img class="art-photo" src="${esc(img)}" alt="${esc(artistName)}" onerror="this.outerHTML='<div class=\\'art-photo-fallback\\'>${esc(artistName[0].toUpperCase())}</div>'">`
     : `<div class="art-photo-fallback">${esc(artistName[0].toUpperCase())}</div>`;
   const hdr = document.createElement('div'); hdr.className = 'art-header';
   hdr.innerHTML = `${imgEl}<div class="art-meta"><div class="art-meta-name">${esc(info?.name || artistName)}</div>${tags ? `<div class="art-tags">${tags}</div>` : ''}</div>`;
   box.appendChild(hdr);
 
-  // Bio (strip Last.fm boilerplate + HTML, cap at ~220 chars)
-  if (info?.bio?.summary) {
-    const raw = info.bio.summary.replace(/<a [^>]+>.*?<\/a>/g, '').replace(/<[^>]+>/g, '').trim();
-    const sentences = raw.split(/(?<=[.!?])\s+/);
-    const bio = sentences.slice(0, 3).join(' ').slice(0, 260).trimEnd();
-    if (bio) {
-      const bioEl = document.createElement('p'); bioEl.className = 'art-bio';
-      bioEl.textContent = bio + (bio.length < raw.length ? '…' : '');
-      box.appendChild(bioEl);
+  // Bio with show more / show less
+  const rawBio = (info?.bio?.content || info?.bio?.summary || '')
+    .replace(/<a [^>]+>.*?<\/a>/g, '').replace(/<[^>]+>/g, '').trim();
+  if (rawBio) {
+    const PREVIEW = 220;
+    const bioEl = document.createElement('p'); bioEl.className = 'art-bio';
+    bioEl.textContent = rawBio.length > PREVIEW ? rawBio.slice(0, PREVIEW).trimEnd() + '…' : rawBio;
+    box.appendChild(bioEl);
+    if (rawBio.length > PREVIEW) {
+      const moreBtn = document.createElement('button'); moreBtn.className = 'art-bio-more';
+      moreBtn.textContent = 'Show more';
+      let open = false;
+      moreBtn.onclick = () => {
+        open = !open;
+        bioEl.textContent = open ? rawBio : rawBio.slice(0, PREVIEW).trimEnd() + '…';
+        moreBtn.textContent = open ? 'Show less' : 'Show more';
+      };
+      box.appendChild(moreBtn);
     }
+  }
+
+  // Albums grid
+  if (topAlbums.length) {
+    const albHdr = document.createElement('span'); albHdr.className = 'disc-sec';
+    albHdr.textContent = 'Albums';
+    box.appendChild(albHdr);
+    const grid = document.createElement('div'); grid.className = 'album-grid';
+    topAlbums.forEach(album => {
+      const card = document.createElement('div'); card.className = 'album-card';
+      const aImg = lfmImg(album.image, 'extralarge') || lfmImg(album.image, 'large');
+      const coverHtml = aImg
+        ? `<div class="alb-cover"><img src="${esc(aImg)}" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"></div>`
+        : `<div class="alb-cover alb-init">${esc(album.name[0]?.toUpperCase() || '?')}</div>`;
+      card.innerHTML = `${coverHtml}<div class="alb-info"><div class="alb-title" title="${esc(album.name)}">${esc(album.name)}</div></div>`;
+      card.onclick = async () => {
+        card.style.opacity = '0.5';
+        try {
+          const q = `${info?.name || artistName} ${album.name}`;
+          const d = await pipedRace('search', { q, filter: 'music_songs' });
+          const v = (d.items || []).map(pipedToVid).find(x => x.id);
+          if (v) { playVideo(v); toast(`Playing: ${album.name}`); } else toast('No YouTube result found');
+        } catch { toast('Search unavailable'); }
+        card.style.opacity = '';
+      };
+      grid.appendChild(card);
+    });
+    box.appendChild(grid);
   }
 
   // Top tracks
   if (topTracks.length) {
     const hdrEl = document.createElement('span'); hdrEl.className = 'disc-sec';
-    hdrEl.textContent = `Top tracks — ${info?.name || artistName}`;
+    hdrEl.textContent = 'Top tracks';
     box.appendChild(hdrEl);
     topTracks.forEach((t, i) => {
       const row = document.createElement('div'); row.className = 'art-track';
@@ -2517,7 +2580,7 @@ async function fetchChannel() {
           <div class="art-track-title">${esc(t.name)}</div>
           ${plays ? `<div class="art-track-plays">${plays}</div>` : ''}
         </div>
-        <span class="art-track-play">▶</span>`;
+        <span class="art-track-play">&#9654;</span>`;
       row.onclick = async () => {
         row.style.opacity = '0.5';
         try {
@@ -2914,7 +2977,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     buddy.classList.toggle('ab-hidden', !buddyEnabled);
     restoreBtn.classList.toggle('show', !buddyEnabled);
   }
-  function applyTts() { ttsBtn.textContent = ttsEnabled ? '🔊' : '🔇'; }
+  function applyTts() { ttsBtn.textContent = 'TTS'; ttsBtn.style.opacity = ttsEnabled ? '1' : '0.45'; }
   applyEnabled(); applyTts();
 
   hideBtn.onclick    = () => { buddyEnabled = false; localStorage.setItem('yt_buddy_enabled','off'); applyEnabled(); window.speechSynthesis?.cancel(); ttsEnabled = false; applyTts(); localStorage.setItem('yt_buddy_tts','off'); };
