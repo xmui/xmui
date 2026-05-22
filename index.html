@@ -33,9 +33,9 @@
     /* Subtle dot grid — signature 2000s tech texture */
     #bg::after {
       content:''; position:absolute; inset:0; pointer-events:none;
-      background-image: radial-gradient(rgba(255,255,255,0.45) 1px, transparent 1px);
-      background-size: 28px 28px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+      background-image:
+        repeating-linear-gradient(120deg, rgba(255,255,255,0.062) 0, rgba(255,255,255,0.062) 1px, transparent 1px, transparent 5px),
+        repeating-linear-gradient(60deg,  rgba(0,0,0,0.038) 0, rgba(0,0,0,0.038) 1px, transparent 1px, transparent 5px);
     }
     .orb { position:absolute; border-radius:50%; will-change:transform; }
     /* Large white glowing orb — top-left */
@@ -657,6 +657,215 @@
       position:fixed; z-index:503; pointer-events:none; font-size:11px; font-weight:700;
       color:#fff; background:rgba(0,0,0,0.6); border-radius:8px; padding:3px 9px;
       white-space:nowrap; animation:hsFlash .6s ease-out forwards;
+    }
+
+    /* ── iOS 6 SKEUOMORPHIC PANEL ENHANCEMENT ───────────── */
+    /* Stronger inner highlight gives glass the tactile iOS 6 feel */
+    .panel {
+      box-shadow: 0 10px 40px rgba(0,80,160,0.18), 0 2px 6px rgba(0,100,180,0.12),
+                  inset 0 1.5px 0 #fff, inset 0 -1px 0 rgba(140,210,255,0.2);
+    }
+
+    /* iOS 6 segmented control — tabs get a proper pill container */
+    #tabs {
+      background: rgba(210,235,255,0.55);
+      padding: 3px 4px;
+      gap: 2px;
+      border-bottom: 1px solid rgba(0,120,180,0.18);
+    }
+    .tab {
+      border-radius: 8px;
+      margin: 0;
+    }
+    .tab.on {
+      background: linear-gradient(180deg, #2ea8ee 0%, #0a70c4 100%);
+      color: #fff;
+      border-bottom-color: transparent;
+      box-shadow: 0 1px 4px rgba(0,100,200,0.45), inset 0 1px 0 rgba(255,255,255,0.26);
+    }
+
+    /* iOS 6-style button: strong top-to-bottom bevel gradient */
+    .cb {
+      background: linear-gradient(180deg,
+        rgba(255,255,255,1)   0%,
+        rgba(232,248,255,0.97) 49%,
+        rgba(208,238,255,0.93) 51%,
+        rgba(192,234,255,0.90) 100%
+      );
+      border-radius: 12px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.88) inset,
+                  0 -1px 0 rgba(0,0,0,0.12) inset,
+                  0 2px 6px rgba(0,100,180,0.16),
+                  0 1px 2px rgba(0,0,0,0.07);
+    }
+    #play-btn {
+      background: linear-gradient(180deg,
+        rgba(255,255,255,0.44) 0%,
+        rgba(255,255,255,0.10) 49%,
+        rgba(0,0,0,0.04) 51%,
+        rgba(0,0,0,0.01) 100%
+      ), linear-gradient(180deg, #48d8f8 0%, #18b8d4 100%);
+      box-shadow: 0 3px 12px rgba(0,150,210,0.54),
+                  0 1px 0 rgba(255,255,255,0.32) inset,
+                  0 -1px 0 rgba(0,0,0,0.18) inset;
+    }
+
+    /* iOS 6 progress bar — inset recessed track */
+    #prog {
+      height: 8px;
+      background: rgba(0,80,150,0.13);
+      border: 1px solid rgba(0,100,160,0.20);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.10);
+      border-radius: 6px;
+    }
+
+    /* iOS 6 search input — inset well look */
+    #q {
+      background: rgba(255,255,255,0.97);
+      border: 1px solid rgba(0,0,0,0.2);
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,0.7);
+      border-radius: 10px;
+    }
+    #search-wrap {
+      background: rgba(215,238,255,0.45);
+    }
+
+    /* ── MOBILE BOTTOM TAB BAR (hidden on desktop) ───────── */
+    #mob-tab-bar {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 50px;
+      z-index: 600;
+      /* iOS 6 bottom bar — dark metallic gradient */
+      background: linear-gradient(180deg, #3e3e3e 0%, #212121 50%, #181818 51%, #0d0d0d 100%);
+      border-top: 1px solid #000;
+      box-shadow: 0 -1px 0 rgba(255,255,255,0.07) inset;
+    }
+    .mob-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      border: none;
+      background: none;
+      color: rgba(255,255,255,0.48);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 4px 0 2px;
+      cursor: pointer;
+      transition: color .14s;
+      font-family: inherit;
+      letter-spacing: .2px;
+    }
+    .mob-tab svg { width: 22px; height: 22px; }
+    .mob-tab.active { color: #5cc8ff; }
+    .mob-tab.active svg { filter: drop-shadow(0 0 5px rgba(92,200,255,0.65)); }
+
+    /* ── MOBILE RESPONSIVE ───────────────────────────────── */
+    @media (max-width: 768px) {
+      html, body { overflow: auto !important; height: auto !important; }
+
+      #app {
+        height: auto;
+        min-height: 100dvh;
+        padding: 4px 5px calc(50px + 6px);
+        gap: 5px;
+      }
+
+      #hdr {
+        border-radius: 0 0 14px 14px;
+        padding: 8px 12px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      #kbd-hint { display: none; }
+      #logo { font-size: 15px; letter-spacing: 3px; }
+      #hdr-clock { font-size: 11px; }
+      #google-btn { font-size: 0; padding: 5px 9px; }
+      #google-btn svg { width: 16px; height: 16px; }
+      #user-nm { display: none; }
+
+      #main {
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+        gap: 5px;
+      }
+
+      /* panels hidden by default — JS adds mob-active to show one */
+      #left, #center, #right { display: none; }
+      #left.mob-active,
+      #center.mob-active,
+      #right.mob-active {
+        display: flex;
+      }
+
+      /* Make left/right panels tall enough to feel like a full screen */
+      #left.mob-active, #right.mob-active {
+        min-height: calc(100dvh - 50px - 64px - 14px);
+      }
+
+      #mob-tab-bar { display: flex; }
+
+      /* Hide desktop collapse buttons */
+      .collapse-btn { display: none !important; }
+
+      /* Bigger touch targets */
+      .r-item, .v-item { padding: 11px 8px; }
+      .mb { padding: 6px 11px; font-size: 10px; }
+      .tab { padding: 9px 4px; font-size: 9px; }
+      .sm-tab { padding: 6px 4px; font-size: 9px; }
+
+      /* Control buttons */
+      .cb { min-width: 48px; height: 40px; font-size: 12px; }
+      #play-btn { min-width: 62px; padding: 8px 20px; font-size: 13px; }
+
+      /* Now playing */
+      #np-thumb { width: 54px; height: 54px; }
+      #np-title { font-size: 14px; }
+      #ctrl-bubble { padding: 10px 14px 12px; }
+
+      /* Volume row */
+      #vol-row { flex-wrap: wrap; gap: 6px; }
+      #vol { flex: 1; min-width: 100%; order: 1; }
+      .vi { order: 0; }
+      #norm-btn { order: 2; }
+      #norm-target { order: 3; }
+      #automix-btn { margin-left: 0; order: 4; flex: 1; }
+
+      /* Buddy + restore above tab bar */
+      #aqua-buddy  { bottom: calc(50px + 16px) !important; right: 14px; }
+      #buddy-restore-btn { bottom: calc(50px + 8px) !important; right: 8px; }
+
+      /* Gun not usable on touch — hide */
+      #aqua-gun { display: none !important; }
+
+      /* Theme panel slides up from bottom */
+      #theme-panel {
+        width: 100%;
+        border-radius: 16px 16px 0 0;
+        top: auto !important;
+        bottom: 50px;
+        right: 0;
+        transform: translateY(100%);
+      }
+      #theme-panel.open { transform: translateY(0); }
+
+      /* Toast above tab bar */
+      #toast { bottom: 60px; }
+
+      /* Modals */
+      .modal { width: 94vw !important; max-width: 94vw !important; }
+
+      /* Playlist wrap more compact */
+      #pl-wrap { max-height: 170px; }
+
+      /* Info strip collapsible row smaller */
+      #info-strip-bar { padding: 6px 10px; }
     }
   </style>
 </head>
@@ -2738,6 +2947,31 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 })();
 
 // ─────────────────────────────────────────────────────────
+//  MOBILE PANEL SWITCHING
+// ─────────────────────────────────────────────────────────
+const MOB_PANEL_MAP = { search: 'left', player: 'center', queue: 'right' };
+function switchMobPanel(name) {
+  // Remove mob-active from all panels
+  ['left', 'center', 'right'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('mob-active');
+    // Also remove collapsed so panel-inner is visible
+    el.classList.remove('collapsed');
+    const inner = document.getElementById(id + '-inner');
+    if (inner) inner.style.display = '';
+  });
+  const target = MOB_PANEL_MAP[name];
+  if (target) document.getElementById(target).classList.add('mob-active');
+  document.querySelectorAll('.mob-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.panel === name)
+  );
+}
+// On mobile, default to showing the player panel
+if (window.matchMedia('(max-width: 768px)').matches) {
+  switchMobPanel('player');
+}
+
+// ─────────────────────────────────────────────────────────
 //  INIT
 // ─────────────────────────────────────────────────────────
 loadSavedTheme();
@@ -2748,5 +2982,33 @@ tryAutoSignIn();
 refreshPipedInstances();
 const _s=document.createElement('script');_s.src='https://www.youtube.com/iframe_api';document.head.appendChild(_s);
 </script>
+
+<!-- MOBILE BOTTOM TAB BAR (hidden on desktop via CSS) -->
+<div id="mob-tab-bar">
+  <button class="mob-tab" data-panel="search" onclick="switchMobPanel('search')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/>
+      <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+    </svg>
+    <span>Search</span>
+  </button>
+  <button class="mob-tab active" data-panel="player" onclick="switchMobPanel('player')">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+    </svg>
+    <span>Now Playing</span>
+  </button>
+  <button class="mob-tab" data-panel="queue" onclick="switchMobPanel('queue')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="8" y1="6"  x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6"  x2="3.01" y2="6"/>
+      <line x1="3" y1="12" x2="3.01" y2="12"/>
+      <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+    <span>Queue</span>
+  </button>
+</div>
 </body>
 </html>
