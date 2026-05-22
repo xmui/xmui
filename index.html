@@ -83,12 +83,22 @@
       border-radius: var(--r) var(--r) 0 0;
     }
     #logo {
-      display:flex; align-items:center; white-space:nowrap; flex-shrink:0;
+      display:flex; align-items:center; white-space:nowrap; flex-shrink:0; cursor:pointer;
     }
     #logo img {
       height:32px; width:auto;
       filter: drop-shadow(0 0 14px rgba(255,255,255,0.45)) drop-shadow(0 1px 4px rgba(0,60,160,0.3));
+      transition: filter .15s;
     }
+    #logo:active img { filter: drop-shadow(0 0 22px rgba(255,255,255,0.9)) brightness(1.2); }
+    @keyframes logoPop {
+      0%   { transform: scale(1) rotate(0deg); }
+      18%  { transform: scale(1.35) rotate(-6deg); }
+      42%  { transform: scale(0.88) rotate(4deg); }
+      68%  { transform: scale(1.12) rotate(-2deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    #logo.logo-pop img { animation: logoPop .52s cubic-bezier(.34,1.56,.64,1) forwards; }
     #kbd-hint { font-size:10px;color:rgba(255,255,255,0.75);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1; }
     .k { background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.38);border-radius:5px;padding:1px 5px;font-family:monospace;font-size:9px;color:#fff; }
     #hdr-clock { font-size:13px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap;opacity:0.9; }
@@ -1461,15 +1471,13 @@ function signOut() {
   document.getElementById('user-chip').style.display = 'none';
   toast('Signed out');
 }
-async function tryAutoSignIn() {
-  // Only attempt auto sign-in if previously authorized; avoids surprise popups
-  if (!clientId || localStorage.getItem('yt_authed') !== '1') return;
-  const s = document.createElement('script');
-  s.src = 'https://accounts.google.com/gsi/client';
-  s.onload = () => {
-    try { initTokenClient(); tokenClient.requestAccessToken({ prompt: '' }); } catch {}
-  };
-  document.head.appendChild(s);
+function tryAutoSignIn() {
+  // Do NOT auto-load GIS or call requestAccessToken on page load — that triggers a popup every refresh.
+  // Instead, show a visual nudge on the Google button so the user can click to reconnect manually.
+  if (localStorage.getItem('yt_authed') === '1') {
+    const btn = document.getElementById('google-btn');
+    if (btn) btn.title = 'Click to reconnect Google account';
+  }
 }
 async function ytApi(ep, params) {
   if (!accessToken) throw new Error('Not signed in');
@@ -2625,7 +2633,17 @@ document.addEventListener('keydown', e => {
 // ─────────────────────────────────────────────────────────
 //  TABS / MODALS / TOAST
 // ─────────────────────────────────────────────────────────
-function switchTab(name,btn) { document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on')); document.querySelectorAll('.tp').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); document.getElementById('tab-'+name).classList.add('on'); }
+function switchTab(name,btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tp').forEach(c=>c.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('tab-'+name).classList.add('on');
+  // Lazy-load Discover when opening the tab with a current track but no results yet
+  if (name === 'related' && current?.id) {
+    const box = document.getElementById('related-list');
+    if (!box.children.length || box.querySelector('.empty')) fetchRelated(current.id);
+  }
+}
 function openModal(id)  { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 document.querySelectorAll('.ov').forEach(el=>el.addEventListener('click',e=>{ if(e.target===el) closeModal(el.id); }));
@@ -2685,7 +2703,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   function applyTts() { ttsBtn.textContent = ttsEnabled ? '🔊' : '🔇'; }
   applyEnabled(); applyTts();
 
-  hideBtn.onclick    = () => { buddyEnabled = false; localStorage.setItem('yt_buddy_enabled','off'); applyEnabled(); window.speechSynthesis?.cancel(); };
+  hideBtn.onclick    = () => { buddyEnabled = false; localStorage.setItem('yt_buddy_enabled','off'); applyEnabled(); window.speechSynthesis?.cancel(); ttsEnabled = false; applyTts(); localStorage.setItem('yt_buddy_tts','off'); };
   restoreBtn.onclick = () => { buddyEnabled = true;  localStorage.setItem('yt_buddy_enabled','on');  applyEnabled(); setTimeout(() => say("omg im back!! u missed me rite :D\n*wipes tear*", 5500), 220); };
   ttsBtn.onclick     = () => { ttsEnabled = !ttsEnabled; localStorage.setItem('yt_buddy_tts', ttsEnabled ? 'on' : 'off'); applyTts(); };
 
@@ -2730,6 +2748,8 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   }
 
   // ── Outfits ────────────────────────────────────────────
+  // Head: center (50,33) radius 27. Top of head ≈ y=6. Forehead ≈ y=15.
+  // Hats sit with brim at forehead (~y=20) and peak above y=6.
   const OUTFIT_DEFS = {
     none: '',
     shades: `
@@ -2741,20 +2761,19 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
       <ellipse cx="36" cy="31" rx="4" ry="2.2" fill="rgba(255,255,255,0.22)" transform="rotate(-18 36 31)"/>
       <ellipse cx="61" cy="31" rx="4" ry="2.2" fill="rgba(255,255,255,0.22)" transform="rotate(-18 61 31)"/>`,
     party: `
-      <polygon points="50,1 27,27 73,27" fill="#ff44bb"/>
-      <polygon points="50,1 27,27 73,27" fill="none" stroke="#ffe800" stroke-width="2.5" stroke-dasharray="5,4"/>
-      <ellipse cx="50" cy="27" rx="23" ry="4.5" fill="#cc2299"/>
-      <circle cx="50" cy="4" r="5.5" fill="#ffe800"/>
-      <text x="36" y="20" font-size="7" fill="rgba(255,230,0,0.95)" font-weight="bold">★</text>
-      <text x="55" y="15" font-size="5.5" fill="rgba(255,255,255,0.85)">✦</text>
-      <text x="40" y="13" font-size="5" fill="rgba(255,200,0,0.8)">✦</text>`,
+      <polygon points="50,2 32,22 68,22" fill="#ff44bb"/>
+      <polygon points="50,2 32,22 68,22" fill="none" stroke="#ffe800" stroke-width="2" stroke-dasharray="5,4"/>
+      <ellipse cx="50" cy="22" rx="19" ry="4" fill="#cc2299"/>
+      <circle cx="50" cy="4" r="5" fill="#ffe800"/>
+      <circle cx="50" cy="4" r="2.5" fill="#ff44bb"/>
+      <text x="38" y="18" font-size="6" fill="rgba(255,230,0,0.95)" font-weight="bold">★</text>
+      <text x="54" y="14" font-size="5" fill="rgba(255,255,255,0.8)">✦</text>`,
     crown: `
-      <path d="M 28 28 L 32 11 L 41 20 L 50 6 L 59 20 L 68 11 L 72 28 Z" fill="#ffd700" stroke="#c8960a" stroke-width="1.2"/>
-      <rect x="28" y="25" width="44" height="5" rx="2.5" fill="#ffd700" stroke="#c8960a" stroke-width="1"/>
-      <circle cx="40.5" cy="16" r="3.2" fill="#ff3333"/>
-      <circle cx="50" cy="8" r="3.2" fill="#44aaff"/>
-      <circle cx="59.5" cy="16" r="3.2" fill="#ff3333"/>
-      <circle cx="50" cy="26.5" r="2" fill="#ffdd44"/>`,
+      <path d="M 30 22 L 35 9 L 42 17 L 50 5 L 58 17 L 65 9 L 70 22 Z" fill="#ffd700" stroke="#c8960a" stroke-width="1.2"/>
+      <rect x="30" y="19" width="40" height="5" rx="2" fill="#ffd700" stroke="#c8960a" stroke-width="1"/>
+      <circle cx="41" cy="14" r="3" fill="#ff3333"/>
+      <circle cx="50" cy="7" r="3" fill="#44aaff"/>
+      <circle cx="59" cy="14" r="3" fill="#ff3333"/>`,
     dj: `
       <path d="M 21 38 A 29 29 0 0 1 79 38" fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
       <rect x="11" y="31" width="14" height="18" rx="7" fill="#2a2a2a"/>
@@ -2766,17 +2785,33 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
       <circle cx="18" cy="40" r="1.5" fill="#fff" opacity="0.6"/>
       <circle cx="82" cy="40" r="1.5" fill="#fff" opacity="0.6"/>`,
     cowboy: `
-      <ellipse cx="50" cy="22" rx="34" ry="6.5" fill="#7a3f0e"/>
-      <path d="M 28 22 Q 28 3 50 3 Q 72 3 72 22 Z" fill="#9a5520"/>
-      <ellipse cx="50" cy="21.5" rx="24" ry="3" fill="#4a2200" opacity="0.4"/>
-      <path d="M 30 19 Q 50 17 70 19" fill="none" stroke="#5a2a00" stroke-width="2.5"/>`,
+      <ellipse cx="50" cy="19" rx="34" ry="5.5" fill="#7a3f0e"/>
+      <path d="M 31 19 Q 31 4 50 4 Q 69 4 69 19 Z" fill="#9a5520"/>
+      <ellipse cx="50" cy="18.5" rx="22" ry="2.5" fill="#4a2200" opacity="0.4"/>
+      <path d="M 32 16 Q 50 14 68 16" fill="none" stroke="#5a2a00" stroke-width="2"/>`,
     beanie: `
-      <path d="M 24 34 Q 23 6 50 6 Q 77 6 76 34" fill="#dd2244"/>
-      <path d="M 24 34 Q 27 18 50 15 Q 73 18 76 34" fill="none" stroke="rgba(255,200,200,0.45)" stroke-width="3" stroke-dasharray="7,5"/>
-      <circle cx="50" cy="6" r="5" fill="#ccc" stroke="#888" stroke-width="1.2"/>
-      <ellipse cx="50" cy="0" rx="5" ry="9" fill="#bbb" opacity="0.9"/>
-      <ellipse cx="50" cy="0" rx="5" ry="9" fill="#bbb" opacity="0.9" transform="rotate(90 50 6)"/>
-      <circle cx="50" cy="6" r="3" fill="#aaa" stroke="#888" stroke-width="0.8"/>`,
+      <path d="M 24 32 Q 23 7 50 7 Q 77 7 76 32" fill="#dd2244"/>
+      <path d="M 25 32 Q 27 18 50 16 Q 73 18 75 32" fill="none" stroke="rgba(255,200,200,0.4)" stroke-width="3" stroke-dasharray="7,5"/>
+      <circle cx="50" cy="7" r="5" fill="#ccc" stroke="#888" stroke-width="1.2"/>
+      <ellipse cx="50" cy="1" rx="4.5" ry="8" fill="#bbb" opacity="0.9"/>
+      <ellipse cx="50" cy="1" rx="4.5" ry="8" fill="#bbb" opacity="0.9" transform="rotate(90 50 7)"/>
+      <circle cx="50" cy="7" r="2.8" fill="#aaa" stroke="#888" stroke-width="0.8"/>`,
+    corpse: `
+      <!-- White base face paint -->
+      <circle cx="50" cy="33" r="26" fill="rgba(255,255,255,0.88)"/>
+      <!-- Black eye smear left -->
+      <ellipse cx="43" cy="35" rx="8" ry="5" fill="rgba(0,0,0,0.82)"/>
+      <path d="M 38 38 Q 36 46 37 54" stroke="rgba(0,0,0,0.55)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- Black eye smear right -->
+      <ellipse cx="57" cy="35" rx="8" ry="5" fill="rgba(0,0,0,0.82)"/>
+      <path d="M 62 38 Q 64 46 63 54" stroke="rgba(0,0,0,0.55)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- Black lips -->
+      <path d="M 43 43.5 Q 50 50.5 57 43.5" stroke="#111" stroke-width="2.8" fill="rgba(0,0,0,0.7)" stroke-linecap="round"/>`,
+    lipstick: `
+      <!-- Bold red lips replacing the simple smile -->
+      <path d="M 41 43 Q 45 40.5 50 42 Q 55 40.5 59 43 Q 55 50 50 51 Q 45 50 41 43 Z" fill="#cc1133"/>
+      <path d="M 41 43 Q 50 46 59 43" fill="none" stroke="#990022" stroke-width="1.2"/>
+      <path d="M 45 41.5 Q 50 42.5 55 41.5" fill="none" stroke="rgba(255,100,120,0.5)" stroke-width="1.5" stroke-linecap="round"/>`,
   };
   const OUTFIT_KEYS = Object.keys(OUTFIT_DEFS);
   let outfitIdx = parseInt(localStorage.getItem('yt_buddy_outfit') || '0');
@@ -2788,6 +2823,9 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
     dj: ["dj aqua is ON THE DECKS!!1\nletz get dis PARTY STARTED", "*scratches invisible vinyl*\nyeeeeeah boi!!1"],
     cowboy: ["yeehaw pardner!!\ni will herd these songz 4 u lolol", "this queue aint big enough\n4 the both of us... jk ur gr8 :D"],
     beanie: ["WHIRRRRRR!!\n*propeller goes brrr*\nim flying 2 ur next fav song", "aerodynamic mode: ACTIVATED\nbeanie = maximum tune power lol"],
+    corpse: ["...black metal mode activated\n*plays tritone chord from beyond the grave*", "ur playlist has been... CURSIFIED\nlolol jk still vibing :D", "the abyss stares back\nbut the abyss also has great taste in music"],
+    lipstick: ["slay. slay. SLAY.\ni am stunning and i know it lol", "serving looks AND great music taste\ni contain multitudes", "*applies lipstick without mirror*\nnailed it obviously"],
+    none: ["bak 2 default!! au naturel\nclassic aqua blob look lol"],
   };
   function applyOutfit() {
     const key = OUTFIT_KEYS[outfitIdx];
@@ -2801,7 +2839,6 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
       const key = OUTFIT_KEYS[outfitIdx];
       const q = OUTFIT_QUIPS[key];
       if (q) setTimeout(() => say(abR(q), 6000), 200);
-      else setTimeout(() => say("bak 2 default!! au naturel\nclassic aqua blob look lol", 5000), 200);
     }
   }
   applyOutfit();
@@ -2809,10 +2846,73 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
   outfitBtn.ontouchstart = e => e.stopPropagation();
   outfitBtn.onclick = () => cycleOutfit(false);
 
-  // Auto outfit change every ~5 min (40% chance)
+  // Auto outfit change every ~5 min (35% chance)
   setInterval(() => {
-    if (Math.random() < 0.4) cycleOutfit(false);
-  }, 5 * 60 * 1000 + Math.random() * 5 * 60 * 1000);
+    if (Math.random() < 0.35) cycleOutfit(false);
+  }, 5 * 60 * 1000 + Math.random() * 4 * 60 * 1000);
+
+  // ── Random props (Monster, iPod, cigarette) ───────────
+  let propActive = false;
+  const PROPS = [
+    {
+      name: 'monster',
+      svg: `<g id="ab-prop" transform="translate(78,58)">
+        <rect x="0" y="0" width="14" height="22" rx="2.5" fill="#1a1a1a"/>
+        <rect x="0" y="0" width="14" height="5" rx="2.5" fill="#0d0d0d"/>
+        <path d="M 3 10 L 7 7 L 11 10 L 9 14 L 5 14 Z" fill="#00cc00" opacity="0.9"/>
+        <rect x="2" y="17" width="10" height="2" rx="1" fill="#333"/>
+      </g>`,
+      lines: ["*cracks open a monster*\nnot sponsored. wish i was.", "monster time!!\nzero sugar just vibes lol", "omg i needed dis\n*aggressive sipping noises*", "MONSTER ENERGY!!\n*becomes 40% more sentient*"],
+      dur: 4000,
+    },
+    {
+      name: 'ipod',
+      svg: `<g id="ab-prop" transform="translate(72,52)">
+        <rect x="0" y="0" width="20" height="28" rx="4" fill="#f0f0f0"/>
+        <rect x="2" y="2" width="16" height="14" rx="2" fill="#a8d8ea"/>
+        <circle cx="10" cy="22" r="4" fill="#e0e0e0"/>
+        <circle cx="10" cy="22" r="2" fill="#ccc"/>
+        <path d="M 0 10 Q -8 10 -8 20 Q -8 30 0 30" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="-8" cy="20" r="3" fill="#e0e0e0"/>
+      </g>`,
+      lines: ["*pulls out iPod*\nclassic!! u cant take dis from me", "iPod classic!! still hits different\n256 songs. all bangers.", "omg 2006 called\ni answered!! and its amazing lol", "scroll wheel goes brrr\nfinest technology known 2 man"],
+      dur: 5000,
+    },
+    {
+      name: 'cig',
+      svg: `<g id="ab-prop" transform="translate(56,46)">
+        <rect x="0" y="0" width="22" height="4" rx="2" fill="#f5e6c8"/>
+        <rect x="18" y="0" width="4" height="4" rx="2" fill="#e88060"/>
+        <rect x="18.5" y="0.5" width="3" height="3" rx="1.5" fill="#ff6030" opacity="0.8"/>
+        <path d="M 20 0 Q 18 -8 22 -15 Q 20 -22 17 -26" fill="none" stroke="rgba(200,200,200,0.5)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 20 0 Q 24 -7 21 -14 Q 23 -20 20 -24" fill="none" stroke="rgba(180,180,180,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+      </g>`,
+      lines: ["*lights cigarette*\nthis playlist is that serious", "smoking is bad for ur health\nbut dis song is good for my soul lol", "existential vibes only\n*exhales slowly into teh void*", "very cinematic of me rn\n*slow drag* ....yeah."],
+      dur: 5500,
+    },
+  ];
+  function doRandomProp() {
+    if (propActive || buddy.classList.contains('ab-dead')) return;
+    propActive = true;
+    const prop = abR(PROPS);
+    // Inject SVG prop into the outfit layer temporarily
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg','g');
+    tmp.innerHTML = prop.svg;
+    const propEl = tmp.firstElementChild;
+    propEl.style.opacity = '0';
+    propEl.style.transition = 'opacity .3s';
+    outfitLayer.appendChild(propEl);
+    requestAnimationFrame(() => { propEl.style.opacity = '1'; });
+    say(abR(prop.lines), prop.dur);
+    setTimeout(() => {
+      propEl.style.opacity = '0';
+      setTimeout(() => { propEl.remove(); propActive = false; }, 350);
+    }, prop.dur - 400);
+  }
+  // Random prop every 3–8 min, 45% chance
+  setInterval(() => {
+    if (buddyEnabled && playing && Math.random() < 0.45) doRandomProp();
+  }, 3 * 60 * 1000 + Math.random() * 5 * 60 * 1000);
 
   // ── Idle animation cycling ─────────────────────────────
   const IDLE_ANIMS = ['', 'ab-idle-bounce', 'ab-idle-sway', 'ab-idle-dance', 'ab-idle-pulse', 'ab-idle-spin'];
@@ -3268,5 +3368,18 @@ const _s=document.createElement('script');_s.src='https://www.youtube.com/iframe
     <span>Queue</span>
   </button>
 </div>
+
+<script>
+// ── Logo click animation ──────────────────────────────────
+(function () {
+  const logo = document.getElementById('logo');
+  logo.addEventListener('click', () => {
+    logo.classList.remove('logo-pop');
+    void logo.offsetWidth;
+    logo.classList.add('logo-pop');
+    logo.addEventListener('animationend', () => logo.classList.remove('logo-pop'), { once: true });
+  });
+})();
+</script>
 </body>
 </html>
