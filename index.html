@@ -600,6 +600,64 @@
     }
     #buddy-restore-btn.show { display:flex; }
     #aqua-buddy.ab-hidden { display:none!important; }
+    /* ── GUN EASTER EGG ─────────────────────────────────── */
+    #aqua-gun {
+      position:fixed; z-index:502; width:92px; cursor:pointer; user-select:none;
+      filter:drop-shadow(0 4px 14px rgba(0,0,0,0.6));
+      opacity:0; transform:scale(0.3) rotate(-25deg); pointer-events:none;
+      transition:opacity .35s, transform .5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    #aqua-gun.ab-gun-show { opacity:1; transform:scale(1) rotate(0); pointer-events:all; }
+    #aqua-gun.ab-gun-show:hover { transform:scale(1.1) rotate(-3deg); filter:drop-shadow(0 4px 18px rgba(0,0,0,0.75)) brightness(1.15); }
+    #aqua-gun.ab-gun-recoil { animation:gunRecoil .18s ease-out forwards; }
+    @keyframes gunRecoil {
+      0%  { transform:scale(1.1) rotate(-3deg) translateX(0); }
+      40% { transform:scale(1.1) rotate(-16deg) translateX(-16px); }
+      100%{ transform:scale(1.1) rotate(-3deg) translateX(0); }
+    }
+    #aqua-buddy.ab-dead {
+      animation:abDie .55s cubic-bezier(0.6,0,0.8,0.4) forwards !important;
+      transform-origin:50% 88%;
+    }
+    @keyframes abDie {
+      0%   { transform:rotate(0deg) translate(0,0);  opacity:1; }
+      50%  { transform:rotate(-115deg) translate(-12px,8px); opacity:.85; }
+      100% { transform:rotate(-96deg)  translate(-9px,15px); opacity:.6;  }
+    }
+    #aqua-buddy.ab-respawn {
+      animation:abRespawn .7s cubic-bezier(0.34,1.56,0.64,1) forwards !important;
+    }
+    @keyframes abRespawn {
+      0%   { transform:scale(0) rotate(360deg); opacity:0; }
+      100% { transform:scale(1)  rotate(0deg);  opacity:1; }
+    }
+    .ab-blood {
+      position:fixed; border-radius:50%; pointer-events:none; z-index:501;
+      background:radial-gradient(circle at 32% 28%, #ff5060, #820010);
+      animation:abBloodFly .75s ease-out forwards;
+    }
+    @keyframes abBloodFly {
+      0%   { opacity:1; transform:translate(0,0) scale(1); }
+      100% { opacity:0; transform:translate(var(--bx),var(--by)) scale(.1); }
+    }
+    #ab-hs-txt {
+      position:fixed; z-index:503; pointer-events:none; white-space:nowrap;
+      font-size:28px; font-weight:900; font-family:Impact,'Arial Black',sans-serif;
+      letter-spacing:3px; color:#ff1a1a;
+      text-shadow:3px 3px 0 #000,-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000;
+      animation:hsFlash .5s ease-out forwards;
+    }
+    @keyframes hsFlash {
+      0%  { opacity:0; transform:rotate(-10deg) scale(.3); }
+      35% { opacity:1; transform:rotate(-10deg) scale(1.4); }
+      65% { opacity:1; transform:rotate(-10deg) scale(1.1); }
+      100%{ opacity:0; transform:rotate(-10deg) scale(.9);  }
+    }
+    #ab-gun-hint {
+      position:fixed; z-index:503; pointer-events:none; font-size:11px; font-weight:700;
+      color:#fff; background:rgba(0,0,0,0.6); border-radius:8px; padding:3px 9px;
+      white-space:nowrap; animation:hsFlash .6s ease-out forwards;
+    }
   </style>
 </head>
 <body>
@@ -917,6 +975,50 @@
 </div>
 
 <button id="buddy-restore-btn" title="Show Aqua Buddy 💙">💙</button>
+
+<!-- GUN EASTER EGG (Konami code: ↑↑↓↓←→←→BA) -->
+<div id="aqua-gun" title="🔫 click to shoot">
+  <svg viewBox="0 0 92 58" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
+    <defs>
+      <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#787878"/><stop offset="100%" stop-color="#2e2e2e"/></linearGradient>
+      <linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8c6238"/><stop offset="100%" stop-color="#4a2e10"/></linearGradient>
+    </defs>
+    <!-- Barrel -->
+    <rect x="28" y="17" width="60" height="13" rx="4" fill="url(#gm)"/>
+    <rect x="80" y="19" width="10" height="9"  rx="2" fill="#1e1e1e"/>
+    <!-- Body -->
+    <rect x="20" y="13" width="36" height="21" rx="5" fill="url(#gm)"/>
+    <!-- Hammer -->
+    <rect x="20" y="9"  width="8"  height="9"  rx="2" fill="#3a3a3a"/>
+    <!-- Cylinder -->
+    <circle cx="36" cy="23" r="11" fill="#3c3c3c" stroke="#1e1e1e" stroke-width="1.5"/>
+    <circle cx="36" cy="23" r="6.5" fill="#1c1c1c"/>
+    <circle cx="36" cy="15.5" r="2.3" fill="#0e0e0e"/>
+    <circle cx="36" cy="30.5" r="2.3" fill="#0e0e0e"/>
+    <circle cx="29" cy="23"   r="2.3" fill="#0e0e0e"/>
+    <circle cx="43" cy="23"   r="2.3" fill="#0e0e0e"/>
+    <!-- Handle -->
+    <rect x="22" y="30" width="18" height="25" rx="5" fill="url(#gh)"/>
+    <rect x="23" y="31" width="9"  height="7"  rx="2" fill="rgba(255,255,255,0.2)"/>
+    <line x1="23" y1="41" x2="39" y2="41" stroke="rgba(0,0,0,0.28)" stroke-width="1.5"/>
+    <line x1="23" y1="45" x2="39" y2="45" stroke="rgba(0,0,0,0.28)" stroke-width="1.5"/>
+    <line x1="23" y1="49" x2="39" y2="49" stroke="rgba(0,0,0,0.28)" stroke-width="1.5"/>
+    <!-- Trigger guard -->
+    <path d="M 30 34 Q 31 48 38 48 Q 46 48 46 40 L 46 34" stroke="#282828" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- Trigger -->
+    <rect x="40" y="31" width="3.5" height="12" rx="1.5" fill="#1a1a1a" transform="rotate(12 41 37)"/>
+    <!-- Barrel shine -->
+    <rect x="30" y="18" width="28" height="4" rx="2" fill="rgba(255,255,255,0.22)"/>
+    <!-- Front sight -->
+    <rect x="84" y="15" width="5" height="3" rx="1" fill="#4a4a4a"/>
+    <!-- Muzzle flash (hidden, shown on fire) -->
+    <g id="gun-flash" opacity="0">
+      <polygon points="88,23 94,18 96,23 94,28" fill="#ffe060"/>
+      <polygon points="90,23 98,20 97,23 98,26" fill="#ffb820"/>
+    </g>
+  </svg>
+</div>
+
 <div id="toast"></div>
 <div id="page-footer" style="position:fixed;bottom:0;left:0;right:0;z-index:50;text-align:center;padding:4px;font-size:10px;color:rgba(58,88,128,0.6);pointer-events:none;">
   <a href="/privacy.html" style="color:rgba(0,104,184,0.55);text-decoration:none;pointer-events:all;" target="_blank">Privacy Policy</a>
@@ -2543,6 +2645,96 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
   // Greeting
   setTimeout(() => say("omg hai!! im Aqua Buddy!! :D\ndrag me anywhere kthx", 7000), 1800);
+})();
+
+// ─────────────────────────────────────────────────────────
+//  EASTER EGG: GUN  (Konami code ↑↑↓↓←→←→BA)
+// ─────────────────────────────────────────────────────────
+(function () {
+  const KONAMI = [38,38,40,40,37,39,37,39,66,65];
+  let kpos = 0, gunActive = false, buddyDead = false;
+  const gun   = document.getElementById('aqua-gun');
+  const buddy = document.getElementById('aqua-buddy');
+  const flash = document.getElementById('gun-flash');
+
+  document.addEventListener('keydown', e => {
+    kpos = (e.keyCode === KONAMI[kpos]) ? kpos + 1 : (e.keyCode === KONAMI[0] ? 1 : 0);
+    if (kpos === KONAMI.length) { kpos = 0; spawnGun(); }
+  });
+
+  function spawnGun() {
+    if (gunActive || buddyDead) return;
+    gunActive = true;
+    const r = buddy.getBoundingClientRect();
+    gun.style.right  = (window.innerWidth  - r.left  + 20) + 'px';
+    gun.style.bottom = (window.innerHeight - r.top - r.height / 2 - 24) + 'px';
+    gun.classList.add('ab-gun-show');
+    buddy.style.cursor = 'crosshair';
+    if (window.abSay) window.abSay("omg is that a—\n\n...omg omg omg 👀", 5500);
+  }
+
+  gun.addEventListener('click', shoot);
+
+  function shoot() {
+    if (!gunActive || buddyDead) return;
+    buddyDead = true;
+    buddy.style.cursor = '';
+
+    // Muzzle flash
+    flash.setAttribute('opacity', '1');
+    setTimeout(() => flash.setAttribute('opacity', '0'), 90);
+    gun.classList.add('ab-gun-recoil');
+    setTimeout(() => gun.classList.remove('ab-gun-recoil'), 220);
+
+    // Blood splat particles
+    const r  = buddy.getBoundingClientRect();
+    const cx = r.left + r.width  / 2;
+    const cy = r.top  + r.height / 2;
+    for (let i = 0; i < 18; i++) {
+      const b   = document.createElement('div');
+      b.className = 'ab-blood';
+      const sz  = 5 + Math.random() * 22;
+      const ang = Math.PI * 2 * i / 18 + (Math.random() - .5) * .9;
+      const d   = 30 + Math.random() * 110;
+      b.style.cssText = `left:${cx - sz/2}px;top:${cy - sz/2}px;width:${sz}px;height:${sz}px;--bx:${Math.cos(ang)*d}px;--by:${Math.sin(ang)*d}px;animation-delay:${Math.random()*80}ms`;
+      document.body.appendChild(b);
+      setTimeout(() => b.remove(), 900);
+    }
+
+    // HEADSHOT!! text
+    const hs = document.createElement('div');
+    hs.id = 'ab-hs-txt';
+    hs.textContent = 'HEADSHOT!!1';
+    hs.style.cssText = `left:${Math.max(4, cx - 88)}px;top:${Math.max(4, cy - 72)}px`;
+    document.body.appendChild(hs);
+    setTimeout(() => hs.remove(), 1600);
+
+    // Kill hint
+    const hint = document.createElement('div');
+    hint.id = 'ab-gun-hint';
+    hint.textContent = '🔫 u killed aqua buddy lol';
+    hint.style.cssText = `left:${Math.max(4, cx - 100)}px;top:${cy + 24}px`;
+    document.body.appendChild(hint);
+    setTimeout(() => hint.remove(), 2800);
+
+    // Death animation
+    buddy.classList.remove('ab-talk', 'ab-drag');
+    buddy.classList.add('ab-dead');
+    if (window.abSay) window.abSay("tell... my playlist...\ni luv it.......\nkthxbai 💀", 8000);
+
+    // Hide gun
+    setTimeout(() => gun.classList.remove('ab-gun-show'), 700);
+
+    // Respawn
+    setTimeout(() => {
+      buddy.classList.remove('ab-dead');
+      void buddy.offsetWidth;
+      buddy.classList.add('ab-respawn');
+      setTimeout(() => { buddy.classList.remove('ab-respawn'); void buddy.offsetWidth; }, 750);
+      gunActive = false; buddyDead = false;
+      if (window.abSay) window.abSay("lol jk!! i respawned!!1\nrofl u actually did it XD :D", 6500);
+    }, 5800);
+  }
 })();
 
 // ─────────────────────────────────────────────────────────
