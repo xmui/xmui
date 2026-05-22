@@ -41,28 +41,34 @@
     /* Large white glowing orb — top-left */
     .o1 { width:700px;height:700px;
           background:radial-gradient(circle at 38% 38%, rgba(255,255,255,0.94) 0%, rgba(210,242,255,0.65) 50%, transparent 78%);
-          filter:blur(52px); top:-190px;left:-180px; animation:orbA 22s ease-in-out infinite; }
+          filter:blur(52px); top:-190px;left:-180px; animation:orbA 14s ease-in-out infinite; }
     /* Aqua tinted orb — bottom-right */
     .o2 { width:560px;height:560px;
           background:radial-gradient(circle at 52% 48%, rgba(160,232,255,0.78) 0%, rgba(100,210,250,0.5) 50%, transparent 78%);
-          filter:blur(65px); bottom:-150px;right:-100px; animation:orbB 28s ease-in-out infinite; }
+          filter:blur(65px); bottom:-150px;right:-100px; animation:orbB 18s ease-in-out infinite; }
     /* Accent tint orb — center-right drift */
     .o3 { width:420px;height:420px;
           background:radial-gradient(circle at 50% 50%, rgba(0,200,240,0.22) 0%, rgba(0,180,220,0.10) 55%, transparent 80%);
-          filter:blur(48px); top:36%;left:40%; animation:orbC 35s ease-in-out infinite; }
+          filter:blur(48px); top:36%;left:40%; animation:orbC 22s ease-in-out infinite; }
     @keyframes orbA {
-      0%,100% { transform:translate(0,0) scale(1); }
-      30%     { transform:translate(44px,-32px) scale(1.05); }
-      65%     { transform:translate(-26px,28px) scale(0.96); }
+      0%   { transform:translate(0,0) scale(1); }
+      22%  { transform:translate(90px,-60px) scale(1.08); }
+      50%  { transform:translate(-70px,50px) scale(0.93); }
+      78%  { transform:translate(40px,80px) scale(1.05); }
+      100% { transform:translate(0,0) scale(1); }
     }
     @keyframes orbB {
-      0%,100% { transform:translate(0,0) scale(1); }
-      40%     { transform:translate(-54px,38px) scale(1.07); }
-      75%     { transform:translate(28px,-22px) scale(0.97); }
+      0%   { transform:translate(0,0) scale(1); }
+      30%  { transform:translate(-100px,70px) scale(1.1); }
+      60%  { transform:translate(60px,-80px) scale(0.94); }
+      85%  { transform:translate(-40px,30px) scale(1.04); }
+      100% { transform:translate(0,0) scale(1); }
     }
     @keyframes orbC {
-      0%,100% { transform:translate(0,0) scale(1); }
-      50%     { transform:translate(40px,-50px) scale(1.12); }
+      0%   { transform:translate(0,0) scale(1); }
+      35%  { transform:translate(110px,-90px) scale(1.15); }
+      65%  { transform:translate(-80px,60px) scale(0.9); }
+      100% { transform:translate(0,0) scale(1); }
     }
 
     /* ── APP SHELL ──────────────────────────────────────── */
@@ -98,7 +104,22 @@
       68%  { transform: scale(1.12) rotate(-2deg); }
       100% { transform: scale(1) rotate(0deg); }
     }
-    #logo.logo-pop img { animation: logoPop .52s cubic-bezier(.34,1.56,.64,1) forwards; }
+    #logo.logo-pop   img { animation: logoPop   .52s cubic-bezier(.34,1.56,.64,1) forwards; }
+    @keyframes logoSpin  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    @keyframes logoShake { 0%,100%{transform:translate(0,0)} 15%{transform:translate(-7px,0)} 30%{transform:translate(7px,0)} 45%{transform:translate(-5px,0)} 60%{transform:translate(5px,0)} 75%{transform:translate(-2px,0)} 90%{transform:translate(2px,0)} }
+    @keyframes logoFlip  { 0%,100%{transform:scaleX(1) rotate(0)} 40%{transform:scaleX(-1.1) rotate(-5deg)} 70%{transform:scaleX(-0.9) rotate(2deg)} }
+    @keyframes logoZoom  { 0%,100%{transform:scale(1)} 35%{transform:scale(1.65)} 65%{transform:scale(0.82)} 80%{transform:scale(1.1)} }
+    @keyframes logoDrop  { 0%{transform:translateY(0) scale(1)} 25%{transform:translateY(-32px) scale(0.82)} 55%{transform:translateY(10px) scale(1.1)} 75%{transform:translateY(-5px) scale(0.96)} 100%{transform:translateY(0) scale(1)} }
+    @keyframes logoJello { 0%,100%{transform:scale3d(1,1,1)} 30%{transform:scale3d(1.28,.72,1)} 40%{transform:scale3d(.72,1.28,1)} 50%{transform:scale3d(1.18,.82,1)} 65%{transform:scale3d(.94,1.06,1)} 78%{transform:scale3d(1.06,.94,1)} }
+    @keyframes logoBeat  { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+    #logo.logo-spin  img { animation: logoSpin  .58s ease-in-out forwards; }
+    #logo.logo-shake img { animation: logoShake .65s ease-in-out forwards; }
+    #logo.logo-flip  img { animation: logoFlip  .55s cubic-bezier(.34,1.56,.64,1) forwards; }
+    #logo.logo-zoom  img { animation: logoZoom  .60s cubic-bezier(.34,1.56,.64,1) forwards; }
+    #logo.logo-drop  img { animation: logoDrop  .68s cubic-bezier(.34,1.56,.64,1) forwards; }
+    #logo.logo-jello img { animation: logoJello .85s cubic-bezier(.34,1.56,.64,1) forwards; }
+    /* Beat thump — purely CSS, GPU composited, zero JS overhead while playing */
+    #logo.logo-beat  img { animation: logoBeat .5s ease-in-out infinite; }
     #kbd-hint { font-size:10px;color:rgba(255,255,255,0.75);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1; }
     .k { background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.38);border-radius:5px;padding:1px 5px;font-family:monospace;font-size:9px;color:#fff; }
     #hdr-clock { font-size:13px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap;opacity:0.9; }
@@ -484,6 +505,55 @@
     .alb-info { padding:6px 8px 8px; }
     .alb-title { font-size:10px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
     .alb-year  { font-size:9px;color:var(--text2);margin-top:1px; }
+
+    /* ── ARTIST TAB ────────────────────────────────────── */
+    .art-header { display:flex;gap:10px;padding:10px 10px 6px;align-items:flex-start; }
+    .art-photo { width:68px;height:68px;border-radius:12px;object-fit:cover;flex-shrink:0;
+      box-shadow:0 3px 12px rgba(0,80,160,0.22); }
+    .art-photo-fallback { width:68px;height:68px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;flex-shrink:0; }
+    .art-meta { flex:1;min-width:0;padding-top:2px; }
+    .art-meta-name { font-size:14px;font-weight:800;color:var(--text);margin-bottom:3px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .art-tags { display:flex;flex-wrap:wrap;gap:3px;margin-top:4px; }
+    .art-tag { font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;
+      background:rgba(0,180,220,0.13);color:var(--accent);text-transform:capitalize; }
+    .art-bio { font-size:10.5px;color:var(--text2);padding:0 10px 8px;line-height:1.65; }
+    .art-bio a { color:var(--accent); }
+    .art-track { display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;transition:background .12s; }
+    .art-track:hover { background:rgba(0,180,220,0.07); }
+    .art-track-num { font-size:9px;color:var(--text2);width:16px;text-align:right;flex-shrink:0; }
+    .art-track-info { flex:1;min-width:0; }
+    .art-track-title { font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .art-track-plays { font-size:9px;color:var(--text2);margin-top:1px; }
+    .art-track-play { font-size:14px;color:var(--accent);opacity:0.55;flex-shrink:0;transition:opacity .12s; }
+    .art-track:hover .art-track-play { opacity:1; }
+
+    /* ── SEARCH DROPDOWN ────────────────────────────────── */
+    #sm-dropdown { position:relative;flex-shrink:0; }
+    #sm-btn {
+      display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:10px;cursor:pointer;
+      border:1.5px solid rgba(80,190,230,0.32);font-size:10px;font-weight:700;color:var(--text2);
+      background:linear-gradient(180deg,rgba(255,255,255,0.97) 0%,rgba(220,245,255,0.88) 100%);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.9);transition:all .13s;white-space:nowrap;
+    }
+    #sm-btn:hover { border-color:var(--accent);color:var(--accent); }
+    #sm-btn.on { background:linear-gradient(180deg,rgba(255,255,255,0.36) 0%,rgba(255,255,255,0.06) 50%,rgba(0,0,0,0.04) 100%),linear-gradient(180deg,#38d0ec 0%,#16b0cc 100%);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(0,150,210,0.38),inset 0 1.5px 0 rgba(255,255,255,0.32); }
+    #sm-menu {
+      position:absolute;top:calc(100% + 5px);left:0;z-index:300;
+      background:rgba(255,255,255,0.98);border:1.5px solid rgba(0,180,220,0.28);
+      border-radius:12px;box-shadow:0 6px 24px rgba(0,80,160,0.2),0 2px 6px rgba(0,120,200,0.1);
+      overflow:hidden;min-width:130px;display:none;
+    }
+    #sm-menu.open { display:block;animation:smDrop .18s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes smDrop { from{opacity:0;transform:translateY(-6px) scale(.95)} to{opacity:1;transform:none} }
+    .sm-opt {
+      display:flex;align-items:center;gap:7px;padding:8px 12px;font-size:11px;font-weight:700;
+      color:var(--text2);cursor:pointer;border:none;background:none;width:100%;text-align:left;
+      transition:background .1s;white-space:nowrap;
+    }
+    .sm-opt:hover { background:rgba(0,180,220,0.08);color:var(--accent); }
+    .sm-opt.active { color:var(--accent);background:rgba(0,180,220,0.06); }
 
     /* ── THEME PANEL ────────────────────────────────────── */
     #theme-panel {
@@ -952,9 +1022,16 @@
             <button id="search-btn" onclick="doSearch()">Go</button>
           </div>
           <div id="search-mode">
-            <button class="sm-tab on" onclick="setSearchMode('videos',this)">Videos</button>
-            <button class="sm-tab" onclick="setSearchMode('playlists',this)">Playlists</button>
-            <button class="sm-tab" id="sc-tab" onclick="setSearchMode('sc',this)">SoundCloud</button>
+            <div id="sm-dropdown">
+              <button id="sm-btn" onclick="toggleSmMenu(event)">
+                <span id="sm-label">YouTube</span> ▾
+              </button>
+              <div id="sm-menu">
+                <button class="sm-opt active" data-mode="videos"     onclick="setSearchMode('videos')">📹 Videos</button>
+                <button class="sm-opt"        data-mode="playlists"  onclick="setSearchMode('playlists')">📋 Playlists</button>
+                <button class="sm-opt"        data-mode="sc"         onclick="setSearchMode('sc')">☁️ SoundCloud</button>
+              </div>
+            </div>
           </div>
           <div id="search-hint">
             Paste a YouTube link, <strong>video ID</strong>, or <strong>playlist URL</strong>
@@ -1036,7 +1113,7 @@
         <div id="tabs">
           <button class="tab on" onclick="switchTab('queue',this)">Queue</button>
           <button class="tab"    onclick="switchTab('related',this)">Discover</button>
-          <button class="tab"    onclick="switchTab('channel',this)">Channel</button>
+          <button class="tab"    onclick="switchTab('channel',this)">Artist</button>
           <button class="tab"    onclick="switchTab('history',this)">History</button>
         </div>
         <div id="tab-queue" class="tp on" style="padding:0;gap:0;">
@@ -1055,7 +1132,7 @@
           </div>
         </div>
         <div id="tab-channel" class="tp">
-          <div id="channel-list"><div class="empty">Play a video to browse its channel</div></div>
+          <div id="channel-list"><div class="empty">Play a video to see artist info</div></div>
         </div>
         <div id="tab-history" class="tp" style="padding:0;gap:0;">
           <div id="history-top">
@@ -1336,24 +1413,55 @@ const THEMES = {
   dark:   { accent:'#38bdf8', accent2:'#0ea5e9', text:'#e0f0f8', text2:'#90b8d0', bg:'linear-gradient(160deg,#1e3a4a,#0f2030,#0a1828)', hdr:'linear-gradient(180deg,#0a2040,#05101e)', panel:'rgba(20,40,60,0.94)', border:'rgba(56,189,248,0.2)' },
 };
 let currentTheme = 'blue';
+
+function hexDerived(hex, lightFactor, darkFactor) {
+  // Returns { light, dark, rgb } from a hex accent color
+  const h = hex.replace('#','');
+  const rv = parseInt(h.slice(0,2),16), gv = parseInt(h.slice(2,4),16), bv = parseInt(h.slice(4,6),16);
+  const mix = (c, f) => Math.min(255, Math.round(c + (255-c)*f)).toString(16).padStart(2,'0');
+  const dim  = (c, f) => Math.max(0,   Math.round(c*f)).toString(16).padStart(2,'0');
+  return {
+    light: `#${mix(rv,lightFactor)}${mix(gv,lightFactor)}${mix(bv,lightFactor)}`,
+    deep:  `#${dim(rv,darkFactor)}${dim(gv,darkFactor)}${dim(bv,darkFactor)}`,
+    rgb: `${rv},${gv},${bv}`,
+  };
+}
+
+function applyAccentToDOM(accent) {
+  const r = document.documentElement.style;
+  r.setProperty('--accent', accent);
+  const { light, deep, rgb } = hexDerived(accent, 0.28, 0.72);
+  r.setProperty('--accent2', light);
+  r.setProperty('--hdr-bg', `linear-gradient(180deg, ${light} 0%, ${accent} 46%, ${deep} 100%)`);
+  r.setProperty('--prog-fill', accent);
+  const o3 = document.querySelector('.o3');
+  if (o3) o3.style.background = `rgba(${rgb},0.18)`;
+  // Restyle key elements that don't use CSS variables
+  document.querySelectorAll('.tab.on').forEach(el => el.style.background = `linear-gradient(180deg,rgba(255,255,255,0.36) 0%,rgba(255,255,255,0.06) 50%,rgba(0,0,0,0.04) 100%), linear-gradient(180deg,${light} 0%,${accent} 100%)`);
+}
+
 function applyTheme(name, customAccent) {
   const t = THEMES[name] || THEMES.blue;
   const r = document.documentElement.style;
   const accent = customAccent || t.accent;
-  r.setProperty('--accent',  accent);
-  r.setProperty('--accent2', t.accent2);
-  r.setProperty('--text',    t.text);
-  r.setProperty('--text2',   t.text2);
-  r.setProperty('--panel',   t.panel);
-  r.setProperty('--border',  t.border);
-  r.setProperty('--hdr-bg',  t.hdr);
+  r.setProperty('--text',  t.text);
+  r.setProperty('--text2', t.text2);
+  r.setProperty('--panel', t.panel);
+  r.setProperty('--border',t.border);
   document.getElementById('bg').style.background = t.bg;
-  // Tint the accent orb to match current theme
-  const o3 = document.querySelector('.o3');
-  if (o3) {
-    const hex = accent.replace('#','');
-    const rv = parseInt(hex.slice(0,2),16), gv = parseInt(hex.slice(2,4),16), bv = parseInt(hex.slice(4,6),16);
-    o3.style.background = `rgba(${rv},${gv},${bv},0.13)`;
+  // If custom accent apply derived colors, else use theme's own header
+  if (customAccent) {
+    applyAccentToDOM(customAccent);
+  } else {
+    r.setProperty('--accent',  t.accent);
+    r.setProperty('--accent2', t.accent2);
+    r.setProperty('--hdr-bg',  t.hdr);
+    const o3 = document.querySelector('.o3');
+    if (o3) {
+      const hex = t.accent.replace('#','');
+      const rv = parseInt(hex.slice(0,2),16), gv = parseInt(hex.slice(2,4),16), bv = parseInt(hex.slice(4,6),16);
+      o3.style.background = `rgba(${rv},${gv},${bv},0.15)`;
+    }
   }
   currentTheme = name;
 }
@@ -1368,7 +1476,7 @@ function selectTheme(name, btn) {
   toast('Theme: ' + btn.textContent);
 }
 function applyCustomAccent(val) {
-  document.documentElement.style.setProperty('--accent', val);
+  applyAccentToDOM(val);
   const saved = JSON.parse(localStorage.getItem('yt_theme') || '{}');
   saved.customAccent = val;
   localStorage.setItem('yt_theme', JSON.stringify(saved));
@@ -1472,12 +1580,23 @@ function signOut() {
   toast('Signed out');
 }
 function tryAutoSignIn() {
-  // Do NOT auto-load GIS or call requestAccessToken on page load — that triggers a popup every refresh.
-  // Instead, show a visual nudge on the Google button so the user can click to reconnect manually.
-  if (localStorage.getItem('yt_authed') === '1') {
-    const btn = document.getElementById('google-btn');
-    if (btn) btn.title = 'Click to reconnect Google account';
-  }
+  // Silently refresh the token if user was previously authorized.
+  // Uses prompt:'' (no UI shown) with a silent error_callback — no popup.
+  if (!clientId || localStorage.getItem('yt_authed') !== '1') return;
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.onload = () => {
+    try {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/youtube.readonly openid profile email',
+        callback: onTokenResponse,
+        error_callback: () => {}, // silent — never show UI
+      });
+      tokenClient.requestAccessToken({ prompt: '' });
+    } catch {}
+  };
+  document.head.appendChild(s);
 }
 async function ytApi(ep, params) {
   if (!accessToken) throw new Error('Not signed in');
@@ -1654,10 +1773,13 @@ function onState(e) {
   const S = YT.PlayerState;
   if (e.data === S.PLAYING) {
     playing = true; document.getElementById('play-btn').textContent = 'Pause'; startProg();
+    if (window.__beatUpdateFn) window.__beatUpdateFn(true);
   } else if (e.data === S.PAUSED || e.data === S.BUFFERING) {
     playing = false; document.getElementById('play-btn').textContent = 'Play';
+    if (window.__beatUpdateFn) window.__beatUpdateFn(false);
   } else if (e.data === S.ENDED) {
     playing = false; document.getElementById('play-btn').textContent = 'Play'; onEnded();
+    if (window.__beatUpdateFn) window.__beatUpdateFn(false);
   }
 }
 function onEnded() {
@@ -1762,7 +1884,7 @@ async function playSoundCloud(v) {
   document.getElementById('np-title').textContent = v.title;
   document.getElementById('np-ch').textContent = v.channelTitle || '';
   const th = document.getElementById('np-thumb'); th.src = v.thumbnail || ''; th.style.display = v.thumbnail ? 'block' : 'none';
-  renderQueue(); fetchRelated(v.id || ''); if (v.channelId) fetchChannel(v.channelId);
+  renderQueue(); fetchRelated(v.id || ''); fetchChannel();
   addToHistory(v); fetchInfo(v);
   if (window.abSayTrack) abSayTrack(v);
   if (normalize) setTimeout(() => { if (scWidget && scReady) scWidget.setVolume(normalizeTarget); }, 800);
@@ -1785,6 +1907,7 @@ async function playSoundCloud(v) {
   scWidget.bind(SC.Widget.Events.READY, () => { scReady = true; scWidget.setVolume(vol); });
   scWidget.bind(SC.Widget.Events.PLAY, () => {
     playing = true; document.getElementById('play-btn').textContent = 'Pause'; startProg();
+    if (window.__beatUpdateFn) window.__beatUpdateFn(true);
     // Pull real metadata from the widget — works without any API key
     scWidget.getCurrentSound(sound => {
       if (!sound) return;
@@ -1796,8 +1919,8 @@ async function playSoundCloud(v) {
       if (artwork) { const th = document.getElementById('np-thumb'); th.src = artwork; th.style.display = 'block'; if (current) current.thumbnail = artwork; }
     });
   });
-  scWidget.bind(SC.Widget.Events.PAUSE,  () => { playing = false; document.getElementById('play-btn').textContent = 'Play'; });
-  scWidget.bind(SC.Widget.Events.FINISH, () => { playing = false; document.getElementById('play-btn').textContent = 'Play'; onEnded(); });
+  scWidget.bind(SC.Widget.Events.PAUSE,  () => { playing = false; document.getElementById('play-btn').textContent = 'Play'; if (window.__beatUpdateFn) window.__beatUpdateFn(false); });
+  scWidget.bind(SC.Widget.Events.FINISH, () => { playing = false; document.getElementById('play-btn').textContent = 'Play'; if (window.__beatUpdateFn) window.__beatUpdateFn(false); onEnded(); });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1820,7 +1943,7 @@ function playVideo(v) {
   document.getElementById('np-title').textContent = v.title;
   document.getElementById('np-ch').textContent = v.channelTitle || '';
   const th = document.getElementById('np-thumb'); th.src = v.thumbnail || ''; th.style.display = v.thumbnail ? 'block' : 'none';
-  renderQueue(); fetchRelated(v.id); if (v.channelId) fetchChannel(v.channelId);
+  renderQueue(); fetchRelated(v.id); fetchChannel();
   addToHistory(v);
   fetchInfo(v);
   if (window.abSayTrack) abSayTrack(v);
@@ -1857,12 +1980,27 @@ const SEARCH_HINTS = {
   playlists: 'Search for YouTube playlists, or paste a playlist URL',
   sc:        'Search SoundCloud tracks, or paste a soundcloud.com URL',
 };
-function setSearchMode(mode, btn) {
+const SM_LABELS = { videos: 'YouTube', playlists: 'YT Playlists', sc: 'SoundCloud' };
+function setSearchMode(mode) {
   curSearchMode = mode;
-  document.querySelectorAll('.sm-tab').forEach(t => t.classList.remove('on'));
-  btn.classList.add('on');
+  document.getElementById('sm-label').textContent = SM_LABELS[mode] || 'YouTube';
+  document.querySelectorAll('.sm-opt').forEach(o => o.classList.toggle('active', o.dataset.mode === mode));
   document.getElementById('search-hint').innerHTML = SEARCH_HINTS[mode] || SEARCH_HINTS.videos;
+  document.getElementById('sm-menu').classList.remove('open');
+  document.getElementById('q').placeholder = mode === 'sc'
+    ? 'Search SoundCloud or paste a soundcloud.com URL...'
+    : mode === 'playlists'
+    ? 'Search playlists or paste a playlist URL...'
+    : 'Search, paste URL, video ID, or playlist ID...';
+  document.getElementById('q').focus();
 }
+function toggleSmMenu(e) {
+  e.stopPropagation();
+  document.getElementById('sm-menu').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#sm-dropdown')) document.getElementById('sm-menu')?.classList.remove('open');
+});
 
 async function doSearch() {
   const raw = document.getElementById('q').value.trim(); if (!raw) return;
@@ -2317,13 +2455,82 @@ async function fetchAutomix(videoId) {
     else toast('Automix: no new related videos found');
   } catch { toast('Automix unavailable'); }
 }
-async function fetchChannel(channelId) {
-  const box = document.getElementById('channel-list'); box.innerHTML = '<div class="empty">Loading...</div>';
+async function fetchChannel() {
+  const box = document.getElementById('channel-list');
+  box.innerHTML = '<div class="empty">Loading artist info…</div>';
+
+  const rawChannel = (current?.channelTitle || '').replace(/\s*-\s*topic$/i, '').trim();
+  const parsedArtist = parseTitle(current?.title || '').artist;
+  const isTrustedChannel = /\s*-\s*topic$/i.test(current?.channelTitle || '') || /vevo$/i.test(current?.channelTitle || '');
+  const artistName = parsedArtist || (isTrustedChannel ? rawChannel : '') || rawChannel;
+  if (!artistName) { box.innerHTML = '<div class="empty">No artist info available</div>'; return; }
+
+  box.innerHTML = '';
+
+  // Fetch info + top tracks in parallel
+  let info = null, topTracks = [];
   try {
-    const d = await pipedRace(`channel/${channelId}`);
-    const items = (d.relatedStreams || []).filter(r => r.url || r.videoId).slice(0, 20).map(pipedToVid).filter(v => v.id);
-    renderVidList(box, items);
-  } catch { box.innerHTML='<div class="empty">Channel unavailable</div>'; }
+    const [infoRes, tracksRes] = await Promise.all([
+      lfmFetch('artist.getInfo',      { artist: artistName, autocorrect: 1 }),
+      lfmFetch('artist.getTopTracks', { artist: artistName, limit: 10, autocorrect: 1 }),
+    ]);
+    info      = infoRes.artist;
+    topTracks = tracksRes?.toptracks?.track || [];
+  } catch {}
+
+  if (!info && !topTracks.length) {
+    box.innerHTML = `<div class="empty">No Last.fm info found for "${esc(artistName)}"</div>`; return;
+  }
+
+  // Header: photo + name + tags
+  const img   = lfmImg(info?.image, 'extralarge') || lfmImg(info?.image, 'large');
+  const tags  = (info?.tags?.tag || []).slice(0, 4).map(t => `<span class="art-tag">${esc(t.name)}</span>`).join('');
+  const imgEl = img
+    ? `<img class="art-photo" src="${esc(img)}" alt="${esc(artistName)}" onerror="this.outerHTML='<div class=\\'art-photo-fallback\\'>${esc(artistName[0])}</div>'">`
+    : `<div class="art-photo-fallback">${esc(artistName[0].toUpperCase())}</div>`;
+  const hdr = document.createElement('div'); hdr.className = 'art-header';
+  hdr.innerHTML = `${imgEl}<div class="art-meta"><div class="art-meta-name">${esc(info?.name || artistName)}</div>${tags ? `<div class="art-tags">${tags}</div>` : ''}</div>`;
+  box.appendChild(hdr);
+
+  // Bio (strip Last.fm boilerplate + HTML, cap at ~220 chars)
+  if (info?.bio?.summary) {
+    const raw = info.bio.summary.replace(/<a [^>]+>.*?<\/a>/g, '').replace(/<[^>]+>/g, '').trim();
+    const sentences = raw.split(/(?<=[.!?])\s+/);
+    const bio = sentences.slice(0, 3).join(' ').slice(0, 260).trimEnd();
+    if (bio) {
+      const bioEl = document.createElement('p'); bioEl.className = 'art-bio';
+      bioEl.textContent = bio + (bio.length < raw.length ? '…' : '');
+      box.appendChild(bioEl);
+    }
+  }
+
+  // Top tracks
+  if (topTracks.length) {
+    const hdrEl = document.createElement('span'); hdrEl.className = 'disc-sec';
+    hdrEl.textContent = `Top tracks — ${info?.name || artistName}`;
+    box.appendChild(hdrEl);
+    topTracks.forEach((t, i) => {
+      const row = document.createElement('div'); row.className = 'art-track';
+      const plays = t.playcount ? (+t.playcount).toLocaleString() + ' plays' : '';
+      row.innerHTML = `<span class="art-track-num">${i + 1}</span>
+        <div class="art-track-info">
+          <div class="art-track-title">${esc(t.name)}</div>
+          ${plays ? `<div class="art-track-plays">${plays}</div>` : ''}
+        </div>
+        <span class="art-track-play">▶</span>`;
+      row.onclick = async () => {
+        row.style.opacity = '0.5';
+        try {
+          const q = `${info?.name || artistName} ${t.name}`;
+          const d = await pipedRace('search', { q, filter: 'music_songs' });
+          const v = (d.items || []).map(pipedToVid).find(x => x.id);
+          if (v) { playVideo(v); } else toast('No YouTube result found');
+        } catch { toast('Search unavailable'); }
+        row.style.opacity = '';
+      };
+      box.appendChild(row);
+    });
+  }
 }
 function renderVidList(box, items) {
   if (!items?.length) { box.innerHTML='<div class="empty">No videos found</div>'; return; }
@@ -2638,10 +2845,17 @@ function switchTab(name,btn) {
   document.querySelectorAll('.tp').forEach(c=>c.classList.remove('on'));
   btn.classList.add('on');
   document.getElementById('tab-'+name).classList.add('on');
-  // Lazy-load Discover when opening the tab with a current track but no results yet
-  if (name === 'related' && current?.id) {
-    const box = document.getElementById('related-list');
-    if (!box.children.length || box.querySelector('.empty')) fetchRelated(current.id);
+  if (current?.id) {
+    // Lazy-load Discover
+    if (name === 'related') {
+      const box = document.getElementById('related-list');
+      if (!box.children.length || box.querySelector('.empty')) fetchRelated(current.id);
+    }
+    // Lazy-load Artist info
+    if (name === 'channel') {
+      const box = document.getElementById('channel-list');
+      if (!box.children.length || box.querySelector('.empty')) fetchChannel();
+    }
   }
 }
 function openModal(id)  { document.getElementById(id).classList.add('show'); }
@@ -3370,15 +3584,45 @@ const _s=document.createElement('script');_s.src='https://www.youtube.com/iframe
 </div>
 
 <script>
-// ── Logo click animation ──────────────────────────────────
+// ── Logo: multi-animation click + beat thump ─────────────
 (function () {
   const logo = document.getElementById('logo');
+  const ANIMS = [
+    { cls: 'logo-pop',   dur: 560  },
+    { cls: 'logo-spin',  dur: 600  },
+    { cls: 'logo-shake', dur: 680  },
+    { cls: 'logo-flip',  dur: 580  },
+    { cls: 'logo-zoom',  dur: 640  },
+    { cls: 'logo-drop',  dur: 720  },
+    { cls: 'logo-jello', dur: 880  },
+  ];
+  const ALL_CLS = ANIMS.map(a => a.cls).concat('logo-beat');
+  let last = null, beatOn = false;
+
   logo.addEventListener('click', () => {
-    logo.classList.remove('logo-pop');
+    let pick;
+    do { pick = ANIMS[Math.floor(Math.random() * ANIMS.length)]; }
+    while (pick === last && ANIMS.length > 1);
+    last = pick;
+    // Temporarily suppress beat so click anim plays cleanly
+    const wasBeat = beatOn;
+    ALL_CLS.forEach(c => logo.classList.remove(c));
     void logo.offsetWidth;
-    logo.classList.add('logo-pop');
-    logo.addEventListener('animationend', () => logo.classList.remove('logo-pop'), { once: true });
+    logo.classList.add(pick.cls);
+    setTimeout(() => {
+      logo.classList.remove(pick.cls);
+      if (wasBeat) logo.classList.add('logo-beat');
+    }, pick.dur + 40);
   });
+
+  // Beat thump — toggle with playing state
+  function updateBeat(isPlaying) {
+    beatOn = isPlaying;
+    logo.classList.toggle('logo-beat', isPlaying);
+  }
+  // Hook into global playing state changes
+  const origOnState = window.__onStateProxy || (() => {});
+  window.__beatUpdateFn = updateBeat;
 })();
 </script>
 </body>
